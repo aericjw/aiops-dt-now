@@ -1,0 +1,105 @@
+{
+  "units": [
+    {
+      "id": "01",
+      "slug": "cloud-azure",
+      "keys_file": "mapping/partitions/01-cloud-azure.keys.txt",
+      "output_file": "mapping/partitions/01-cloud-azure.csv",
+      "expected": 122,
+      "actual": 122,
+      "target_families": [
+        "cmdb_ci_cloud_*",
+        "cmdb_azure_*"
+      ]
+    },
+    {
+      "id": "02",
+      "slug": "cloud-aws",
+      "keys_file": "mapping/partitions/02-cloud-aws.keys.txt",
+      "output_file": "mapping/partitions/02-cloud-aws.csv",
+      "expected": 95,
+      "actual": 95,
+      "target_families": [
+        "cmdb_ci_aws_*",
+        "cmdb_ci_cloud_*"
+      ]
+    },
+    {
+      "id": "03",
+      "slug": "cloud-gcp-oci",
+      "keys_file": "mapping/partitions/03-cloud-gcp-oci.keys.txt",
+      "output_file": "mapping/partitions/03-cloud-gcp-oci.csv",
+      "expected": 31,
+      "actual": 31,
+      "target_families": [
+        "cmdb_ci_cloud_*"
+      ]
+    },
+    {
+      "id": "04",
+      "slug": "core",
+      "keys_file": "mapping/partitions/04-core.keys.txt",
+      "output_file": "mapping/partitions/04-core.csv",
+      "expected": 108,
+      "actual": 108,
+      "target_families": [
+        "cmdb_ci_computer",
+        "cmdb_ci_appl",
+        "cmdb_ci_service_*",
+        "cmdb_ci_kubernetes_*"
+      ]
+    },
+    {
+      "id": "05",
+      "slug": "database",
+      "keys_file": "mapping/partitions/05-database.keys.txt",
+      "output_file": "mapping/partitions/05-database.csv",
+      "expected": 30,
+      "actual": 30,
+      "target_families": [
+        "cmdb_ci_db_*"
+      ]
+    },
+    {
+      "id": "06",
+      "slug": "server-virt",
+      "keys_file": "mapping/partitions/06-server-virt.keys.txt",
+      "output_file": "mapping/partitions/06-server-virt.csv",
+      "expected": 39,
+      "actual": 39,
+      "target_families": [
+        "cmdb_ci_win_server",
+        "cmdb_ci_linux_server",
+        "cmdb_ci_storage_*",
+        "cmdb_ci_vcenter_*",
+        "cmdb_ci_hyper_*"
+      ]
+    },
+    {
+      "id": "07",
+      "slug": "network",
+      "keys_file": "mapping/partitions/07-network.keys.txt",
+      "output_file": "mapping/partitions/07-network.csv",
+      "expected": 38,
+      "actual": 38,
+      "target_families": [
+        "cmdb_ci_network_*",
+        "cmdb_ci_lb_*",
+        "cmdb_ci_firewall_*",
+        "cmdb_ci_ip_*"
+      ]
+    },
+    {
+      "id": "08",
+      "slug": "middleware-apps",
+      "keys_file": "mapping/partitions/08-middleware-apps.keys.txt",
+      "output_file": "mapping/partitions/08-middleware-apps.csv",
+      "expected": 70,
+      "actual": 70,
+      "target_families": [
+        "cmdb_ci_appl_*",
+        "cmdb_ci_endpoint_*"
+      ]
+    }
+  ]
+}
