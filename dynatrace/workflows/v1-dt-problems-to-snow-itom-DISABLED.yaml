@@ -10,7 +10,7 @@ schemaVersion: 4
 trigger:
   eventTrigger:
     filterQuery: event.kind == "DAVIS_PROBLEM" AND dt.analysis.ready == true AND (matchesValue(event.category, {"MONITORING_UNAVAILABLE", "AVAILABILITY", "ERROR", "SLOWDOWN", "RESOURCE_CONTENTION", "CUSTOM_ALERT", "INFO"}))
-    isActive: true
+    isActive: false
     triggerConfiguration:
       type: davis-problem
       value:
