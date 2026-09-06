@@ -1,0 +1,5 @@
+dt_entity_key,namespace,source_type
+host,builtin,dynatrace
+service,builtin,dynatrace
+k8s_pod,builtin,dynatrace
+cloud:aws:lambda,cloud,dynatrace

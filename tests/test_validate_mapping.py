@@ -58,3 +58,77 @@ def test_bad_sgc_managed_is_rejected():
 def test_bind_strategy_enum_matches_spec():
     assert BIND_STRATEGIES == {
         "sgc_service", "sgc_host", "sgc_process", "ire_correlated"}
+
+
+# CLI tests exercising main() end-to-end
+import subprocess
+import tempfile
+
+
+def fixtures_dir():
+    return pathlib.Path(__file__).resolve().parent / "fixtures"
+
+
+def test_cli_valid_mapping_exits_zero():
+    """CLI should exit 0 on a valid mapping."""
+    result = subprocess.run(
+        ["python3", "scripts/validate_mapping.py",
+         str(fixtures_dir() / "mapping-valid.csv"),
+         str(fixtures_dir() / "ground-truth-keys.csv"),
+         str(fixtures_dir() / "ground-truth-classes.csv")],
+        cwd="/Users/aeric/Projects/aiops-dt-now",
+        capture_output=True, text=True
+    )
+    assert result.returncode == 0, f"Expected exit 0, got {result.returncode}. stderr: {result.stderr}"
+    assert "PASS" in result.stdout
+
+
+def test_cli_nonexistent_class_exits_one():
+    """CLI should exit 1 when a mapping names a class that doesn't exist."""
+    result = subprocess.run(
+        ["python3", "scripts/validate_mapping.py",
+         str(fixtures_dir() / "mapping-bad-class.csv"),
+         str(fixtures_dir() / "ground-truth-keys.csv"),
+         str(fixtures_dir() / "ground-truth-classes.csv")],
+        cwd="/Users/aeric/Projects/aiops-dt-now",
+        capture_output=True, text=True
+    )
+    assert result.returncode == 1, f"Expected exit 1, got {result.returncode}"
+    assert "cmdb_ci_nonexistent" in result.stderr
+    assert "FAIL" in result.stderr
+
+
+def test_cli_missing_columns_exits_one_and_reports():
+    """CLI should exit 1 and report missing columns when columns are absent."""
+    result = subprocess.run(
+        ["python3", "scripts/validate_mapping.py",
+         str(fixtures_dir() / "mapping-missing-columns.csv"),
+         str(fixtures_dir() / "ground-truth-keys.csv"),
+         str(fixtures_dir() / "ground-truth-classes.csv")],
+        cwd="/Users/aeric/Projects/aiops-dt-now",
+        capture_output=True, text=True
+    )
+    assert result.returncode == 1, f"Expected exit 1, got {result.returncode}"
+    assert "missing columns" in result.stderr
+    assert "bind_strategy" in result.stderr or "sgc_managed" in result.stderr
+    assert "FAIL" in result.stderr
+
+
+def test_cli_unknown_sentinel_is_added_by_main():
+    """The __unknown__ sentinel should be injected by main() into valid keys.
+
+    A mapping whose only extra row (beyond the fixture keys) is __unknown__
+    should validate successfully, not be flagged as unknown.
+    """
+    result = subprocess.run(
+        ["python3", "scripts/validate_mapping.py",
+         str(fixtures_dir() / "mapping-valid.csv"),
+         str(fixtures_dir() / "ground-truth-keys.csv"),
+         str(fixtures_dir() / "ground-truth-classes.csv")],
+        cwd="/Users/aeric/Projects/aiops-dt-now",
+        capture_output=True, text=True
+    )
+    assert result.returncode == 0, f"Expected exit 0, got {result.returncode}. stderr: {result.stderr}"
+    # The mapping-valid.csv includes __unknown__ explicitly, so it should pass
+    # without any "not a known entity type" error for __unknown__
+    assert "not a known entity type" not in result.stderr

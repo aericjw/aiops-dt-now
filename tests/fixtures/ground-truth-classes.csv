@@ -1,0 +1,5 @@
+class_name,label
+cmdb_ci_computer,Computer
+cmdb_ci_service_calculated,Service Calculated
+cmdb_ci_appl,Application
+cmdb_ci,CI

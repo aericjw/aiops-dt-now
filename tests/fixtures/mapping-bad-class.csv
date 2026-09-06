@@ -1,0 +1,6 @@
+dt_entity_key,now_ci_class,bind_strategy,sgc_managed
+host,cmdb_ci_computer,sgc_host,true
+service,cmdb_ci_nonexistent,sgc_service,false
+k8s_pod,cmdb_ci_appl,ire_correlated,true
+cloud:aws:lambda,cmdb_ci,sgc_process,false
+__unknown__,cmdb_ci_appl,ire_correlated,false
