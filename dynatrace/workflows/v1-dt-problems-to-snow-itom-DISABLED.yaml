@@ -1,0 +1,100 @@
+id: 68577e86-3a50-4dc6-ad94-750d4d6d4990
+title: Dynatrace Problems to ServiceNow ITOM (AIOps)
+isDeployed: true
+description: Forwards Davis problems to ServiceNow ITOM Event Management as em_event records. ServiceNow performs dedup, reopen and close natively using message_key, so a single task covers the entire problem lifecycle.
+actor: 1910bc7a-1e77-420e-b669-3ffba145e214
+owner: 1910bc7a-1e77-420e-b669-3ffba145e214
+ownerType: USER
+isPrivate: false
+schemaVersion: 4
+trigger:
+  eventTrigger:
+    filterQuery: event.kind == "DAVIS_PROBLEM" AND dt.analysis.ready == true AND (matchesValue(event.category, {"MONITORING_UNAVAILABLE", "AVAILABILITY", "ERROR", "SLOWDOWN", "RESOURCE_CONTENTION", "CUSTOM_ALERT", "INFO"}))
+    isActive: true
+    triggerConfiguration:
+      type: davis-problem
+      value:
+        analysisReady: true
+        categories:
+          availability: true
+          custom: true
+          error: true
+          info: true
+          monitoringUnavailable: true
+          resource: true
+          slowdown: true
+        customFilter: ""
+        entityTags: {}
+        entityTagsMatch: null
+        onProblemClose: true
+        problemOpenDuration: null
+        severityThreshold: null
+        triggerOn: open-and-close
+        triggerOnUpdateFields:
+          - dt.davis.impact_level
+          - event.category
+          - event.severity
+          - root_cause_entity_id
+    uniqueExpression: '{{ event()["event.id"] }}-{{ "open" if event()["event.status"] == "ACTIVE" else "resolved" }}-{{ event()["dt.davis.last_reopen_timestamp"] }}'
+triggerType: Event
+type: STANDARD
+input:
+  ci_type_default: cmdb_ci_service_calculated
+  node_entity_types:
+    - HOST
+    - AWS_EC2_INSTANCE
+    - AZURE_VM
+    - GOOGLE_COMPUTE_ENGINE_INSTANCE
+  problem_url_path: /ui/apps/dynatrace.classic.problems/ui/problems/
+  snow_source: Dynatrace
+  snow_table: em_event
+hourlyExecutionLimit: 1000
+tasks:
+  send_event_to_servicenow:
+    action: dynatrace.servicenow:snow-create-record
+    description: 'Create one em_event in ServiceNow. Handles open, update and close: message_key is the stable Dynatrace problem event ID, so ServiceNow Event Management dedupes and reopens automatically, and severity 0 (Clear) on problem close resolves the alert.'
+    input:
+      connectionId: vu9U3hXa3q0AAAABACNhcHA6ZHluYXRyYWNlLnNlcnZpY2Vub3c6Y29ubmVjdGlvbgAGdGVuYW50AAZ0ZW5hbnQAJGY2YzBkZDM2LWUxNmYtM2MwNi04YTYzLTY2NjQ5MTBkMTNhNL7vVN4V2t6t
+      fields:
+        - id: f-message-key
+          key: message_key
+          value: '{{ event()[''event.id''] }}'
+        - id: f-source
+          key: source
+          value: '{{ input(''snow_source'') }}'
+        - id: f-severity
+          key: severity
+          value: '{{ 0 if event()[''event.status''] == ''CLOSED'' else event()[''event.severity''] }}'
+        - id: f-type
+          key: type
+          value: '{{ event()[''event.category''] }}'
+        - id: f-resource
+          key: resource
+          value: '{{ event()[''root_cause_entity_name''] | default(event()[''event.name''], true) }}'
+        - id: f-metric-name
+          key: metric_name
+          value: '{{ event()[''event.name''] }}'
+        - id: f-description
+          key: description
+          value: '[{{ event()[''display_id''] }}] {{ event()[''event.name''] }} — {{ event()[''event.description''] | default('''', true) | truncate(900, true) }}'
+        - id: f-node
+          key: node
+          value: '{{ (event()[''smartscape.affected_entities''] | default([], true) | selectattr(''type'', ''in'', input(''node_entity_types'')) | map(attribute=''name'') | first) | default('''', true) }}'
+        - id: f-ci-type
+          key: ci_type
+          value: '{{ input(''ci_type_default'') }}'
+        - id: f-ci-identifier
+          key: ci_identifier
+          value: '{{ {''name'': (([event()[''root_cause_entity_name''] | default('''', true)] + (event()[''smartscape.affected_entities''] | default([], true) | map(attribute=''name'') | list) + (event()[''affected_entity_names''] | default([], true) | list)) | select | first | default('''', true))} | tojson }}'
+        - id: f-correlation-id
+          key: correlation_id
+          value: '{{ ([event()[''root_cause_entity_id''] | default('''', true)] + (event()[''smartscape.affected_entities''] | default([], true) | map(attribute=''id'') | list) + (event()[''affected_entity_ids''] | default([], true) | list)) | select | first | default('''', true) }}'
+        - id: f-additional-info
+          key: additional_info
+          value: '{{ {''dynatrace_problem_id'': event()[''display_id''] | default(none),''dynatrace_event_id'': event()[''event.id''] | default(none),''dynatrace_url'': environment().url ~ input(''problem_url_path'') ~ event()[''event.id''],''status_transition'': event()[''event.status_transition''] | default(none),''impact_level'': event()[''dt.davis.impact_level''] | default(none),''affected_entity_ids'': event()[''affected_entity_ids''] | default(none),''affected_entity_names'': event()[''affected_entity_names''] | default(none),''root_cause_entity_id'': event()[''root_cause_entity_id''] | default(none),''affected_users_count'': event()[''dt.davis.affected_users_count''] | default(none),''is_duplicate'': event()[''dt.davis.is_duplicate''] | default(none),''entity_tags'': event()[''entity_tags''] | default(none)} | tojson }}'
+      tableName: '{{ input(''snow_table'') }}'
+    name: send_event_to_servicenow
+    position:
+      x: 0
+      "y": 1
+    predecessors: []
