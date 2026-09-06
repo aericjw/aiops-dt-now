@@ -23,6 +23,11 @@ trigger:
           monitoringUnavailable: true
           resource: true
           slowdown: true
+        # Empty string = tenant-wide (no cluster/entity restriction). This is a
+        # literal value, not a workflow input: Dynatrace's trigger config parser
+        # rejects {{ input() }} templates inside customFilter, so this field
+        # cannot be parameterized. To re-scope, edit this literal directly, e.g.
+        # matchesValue(k8s.cluster.name, "some-cluster").
         customFilter: ""
         entityTags: {}
         entityTagsMatch: null
@@ -41,7 +46,6 @@ type: STANDARD
 input:
   snow_source: Dynatrace
   snow_table: em_event
-  scope_filter: ""
 hourlyExecutionLimit: 1000
 tasks:
   extract_events:
