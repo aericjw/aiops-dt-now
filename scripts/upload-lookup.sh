@@ -10,8 +10,15 @@ set -euo pipefail
 
 SRC="${1:-mapping/dt_to_snow_cmdb_mapping.csv}"
 LOOKUP_PATH="${2:-/lookups/dt_to_snow_cmdb_mapping_v2}"
+EXPECTED_CONTEXT="${EXPECTED_CONTEXT:-tacocorp}"
 
-echo "==> context: $(dtctl config current-context --plain)"
+CONTEXT="$(dtctl config current-context --plain)"
+echo "==> context: $CONTEXT"
+if [ "$CONTEXT" != "$EXPECTED_CONTEXT" ]; then
+  echo "ERROR: context is '$CONTEXT', expected '$EXPECTED_CONTEXT'" >&2
+  exit 1
+fi
+
 echo "==> validating $SRC"
 python3 scripts/validate_mapping.py "$SRC"
 
