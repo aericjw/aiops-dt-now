@@ -1,0 +1,222 @@
+id: 7c35a230-d8bf-4379-8137-43b8ad000f3d
+title: Dynatrace Problems to ServiceNow ITOM (AIOps) v2
+isDeployed: true
+description: Forwards Davis problems to ServiceNow ITOM Event Management as em_event records. ServiceNow performs dedup, reopen and close natively using message_key, so a single task covers the entire problem lifecycle.
+actor: 1910bc7a-1e77-420e-b669-3ffba145e214
+owner: 1910bc7a-1e77-420e-b669-3ffba145e214
+ownerType: USER
+isPrivate: false
+schemaVersion: 4
+trigger:
+  eventTrigger:
+    filterQuery: event.kind == "DAVIS_PROBLEM" AND dt.analysis.ready == true AND (matchesValue(event.category, {"MONITORING_UNAVAILABLE", "AVAILABILITY", "ERROR", "SLOWDOWN", "RESOURCE_CONTENTION", "CUSTOM_ALERT", "INFO"})) AND (matchesValue(k8s.cluster.name, "aeric-walls-aks"))
+    isActive: true
+    triggerConfiguration:
+      type: davis-problem
+      value:
+        analysisReady: true
+        categories:
+          availability: true
+          custom: true
+          error: true
+          info: true
+          monitoringUnavailable: true
+          resource: true
+          slowdown: true
+        customFilter: matchesValue(k8s.cluster.name, "aeric-walls-aks")
+        entityTags: {}
+        entityTagsMatch: null
+        onProblemClose: true
+        problemOpenDuration: null
+        severityThreshold: null
+        triggerOn: open-and-close
+        triggerOnUpdateFields:
+          - dt.davis.impact_level
+          - event.category
+          - event.severity
+          - root_cause_entity_id
+    uniqueExpression: '{{ event()["event.id"] }}-{{ "open" if event()["event.status"] == "ACTIVE" else "resolved" }}-{{ event()["dt.davis.last_reopen_timestamp"] }}'
+triggerType: Event
+type: STANDARD
+input:
+  snow_source: Dynatrace
+  snow_table: em_event
+hourlyExecutionLimit: 1000
+tasks:
+  extract_events:
+    action: dynatrace.automations:execute-dql-query
+    customSampleResult:
+      records:
+        - dt.analysis.offset: "300000000000"
+          dt.davis.impact_level: Services
+          dt.davis.is_frequent_event: false
+          dt.davis.is_rootcause_relevant: true
+          dt.davis.mute.status: NOT_MUTED
+          dt.davis.timeout: "9"
+          dt.entity.cloud_application:
+            - CLOUD_APPLICATION-6DEA6CD9B2A01320
+          dt.entity.cloud_application.name:
+            - frontend
+          dt.entity.cloud_application.type.name: Kubernetes workload
+          dt.entity.cloud_application_namespace:
+            - CLOUD_APPLICATION_NAMESPACE-977945A8F690CB33
+          dt.entity.cloud_application_namespace.name:
+            - astroshop
+          dt.entity.cloud_application_namespace.type.name: Kubernetes namespace
+          dt.entity.kubernetes_cluster:
+            - KUBERNETES_CLUSTER-BBB0E13242F16433
+          dt.entity.kubernetes_cluster.name:
+            - aeric-walls-aks
+          dt.entity.kubernetes_cluster.type.name: Kubernetes cluster
+          dt.entity.service: SERVICE-9BE8E7CD3715AE37
+          dt.entity.service.name: frontend - astroshop - aeric-walls-aks
+          dt.entity.service.type.name: Service
+          dt.event.correlation_id: 330a400f45acf983af49048ee1d108b1
+          dt.openpipeline.pipelines:
+            - davis.events:default
+          dt.openpipeline.source: baselining
+          dt.query: |-
+            timeseries {
+              failuresCount = sum(dt.service.request.failure_count),
+              totalCount = sum(dt.service.request.count)
+            }, by: { endpoint.name, dt.entity.service }, filter: {
+              dt.entity.service == "SERVICE-9BE8E7CD3715AE37"
+              AND endpoint.name == "POST /api/checkout"
+            }, nonempty: true
+            | fieldsAdd expression = failuresCount[] / totalCount[] * 100
+            | fieldsRemove failuresCount, totalCount
+
+            | fieldsAdd metricName = "Failure rate"
+          dt.smartscape.k8s_cluster: K8S_CLUSTER-F1E6F62616280CAB
+          dt.smartscape.k8s_deployment: K8S_DEPLOYMENT-751A28BDE87FD7E5
+          dt.smartscape.k8s_namespace: K8S_NAMESPACE-2E7382AE3908C804
+          dt.smartscape.service: SERVICE-9BE8E7CD3715AE37
+          dt.smartscape_source.id: SERVICE-9BE8E7CD3715AE37
+          dt.smartscape_source.type: SERVICE
+          dt.source_entity: SERVICE-9BE8E7CD3715AE37
+          dt.source_entity.type: service
+          dt_entity_type:
+            - SERVICE
+          endpoint.name: POST /api/checkout
+          entity_tags:
+            - azure.location:westus2
+            - azure.subscription:7a91e8b3-ee09-4906-91a2-f357b77a61fd
+            - k8s.namespace.name:astroshop
+            - primary_tags.app:astroshop
+            - primary_tags.environment:azure
+            - primary_tags.team:agentic-aeric
+            - serviceTag:frontend - astroshop - aeric-walls-aks
+          event.name: Failure rate increase
+          k8s.cluster.name:
+            - aeric-walls-aks
+          k8s.namespace.name:
+            - astroshop
+          k8s.workload.name:
+            - frontend
+          name: frontend - astroshop - aeric-walls-aks - SERVICE-9BE8E7CD3715AE37
+          now_ci_type: cmdb_ci_service_calculated
+          primary_tags.app:
+            - astroshop
+          primary_tags.environment:
+            - azure
+          primary_tags.team:
+            - agentic-aeric
+          sgc_supported: true
+          smartscape.affected_entities:
+            - id: SERVICE-9BE8E7CD3715AE37
+              type: SERVICE
+          smartscape.affected_entity.ids:
+            - SERVICE-9BE8E7CD3715AE37
+          smartscape.affected_entity.types:
+            - SERVICE
+          smartscape.related_entities:
+            - id: K8S_CLUSTER-F1E6F62616280CAB
+              name: aeric-walls-aks
+              type: K8S_CLUSTER
+            - id: K8S_DEPLOYMENT-751A28BDE87FD7E5
+              name: frontend
+              type: K8S_DEPLOYMENT
+            - id: K8S_NAMESPACE-2E7382AE3908C804
+              name: astroshop
+              type: K8S_NAMESPACE
+          smartscape.related_entity.ids:
+            - K8S_CLUSTER-F1E6F62616280CAB
+            - K8S_DEPLOYMENT-751A28BDE87FD7E5
+            - K8S_NAMESPACE-2E7382AE3908C804
+          smartscape.related_entity.types:
+            - K8S_CLUSTER
+            - K8S_DEPLOYMENT
+            - K8S_NAMESPACE
+          timestamp: "2026-09-04T14:50:51.963000000Z"
+    description: Make use of Dynatrace Grail data in your workflow.
+    input:
+      failOnEmptyResult: false
+      query: |-
+        fetch events, from:"{{event()["timestamp"]}}"-5m, to:"{{event()["timestamp"]}}"+5m
+        | filter event.kind == "DAVIS_EVENT"
+        | filter in(event.id, {{event()["dt.davis.event_ids"] | replace("[", "{") | replace("]", "}") | replace("'", "\"")}})
+        | dedup event.id, sort:{timestamp desc}
+        | fieldsAdd name = coalesce(getNodeName(dt.smartscape_source.id), `dt.entity.process_group.name`, `dt.entity.cloud:azure:network:networkinterfaces.name`, `dt.entity.cloud:gcp:k8s_container.name`, `dt.entity.cloud:aws:sage_maker:processing_job.name`, `dt.entity.prometheus:confluent_kafka_ksql.name`, `dt.entity.cloud:aws:kinesis:data_stream.name`, `dt.entity.cloud:azure:cdn:profiles.name`, `dt.entity.sql:snowflake_warehouse.name`, `dt.entity.google_compute_engine.name`, `dt.entity.wmi:com_dynatrace_extension_ad_dhcp.name`, `dt.entity.cloud:azure:keyvault:vaults.name`, `dt.entity.cloud:aws:iotanalytics.name`, `dt.entity.azure_iot_hub.name`, `dt.entity.elasticsearch:node.name`, `dt.entity.cloud:aws:fsx.name`, `dt.entity.cloud:aws:logs.name`, `dt.entity.sql:snowflake_account.name`, `dt.entity.cloud:azure:netapp:netappaccounts:capacitypools:volumes.name`, `dt.entity.activemq:topic.name`, `dt.entity.cloud:aws:usage.name`, `dt.entity.jmx:com_dynatrace_extension_spark_process.name`, `dt.entity.nutanix:cluster.name`, `dt.entity.disk-devices:disk.name`, `dt.entity.environment.name`, `dt.entity.hyperv:network_interface_card.name`, `dt.entity.cloud:azure:synapse:workspaces.name`, `dt.entity.multiprotocol_monitor.name`, `dt.entity.cloud:aws:media_tailor.name`, `dt.entity.cloud:azure:streamanalytics:streamingjobs.name`, `dt.entity.cloud:azure:postgresql:serverv2.name`, `dt.entity.cloud:azure:hybridcompute:machines.name`, `dt.entity.sql:hana_db_database.name`, `dt.entity.otel:process.name`, `dt.entity.cloud:azure:media:mediaservices.name`, `dt.entity.prometheus:confluent_kafka_cluster.name`, `dt.entity.cloud:azure:web:serverfarms.name`, `dt.entity.geoloc_site.name`, `dt.entity.cloud:aws:vpn.name`, `dt.entity.arquitetura_referencia:business_svc.name`, `dt.entity.cloud:azure:cognitiveservices:bingcustomsearch.name`, `dt.entity.hyperv:virtual_machine.name`, `dt.entity.cloud:aws:sage_maker:batch_transform_job.name`, `dt.entity.service_instance.name`, `dt.entity.azure_tenant.name`, `dt.entity.network_interface.name`, `dt.entity.gcp_zone.name`, `dt.entity.cloud:aws:dxcon.name`, `dt.entity.cloud:azure:classic_storage_account.name`, `dt.entity.cloud:aws:dms.name`, `dt.entity.hyperv:virtual_network_interface_card.name`, `dt.entity.python:com_dynatrace_extension_meraki_organization.name`, `dt.entity.python:com_dynatrace_extension_mongo_atlas_partition.name`, `dt.entity.cloud:aws:documentdb.name`, `dt.entity.sql:postgres_tablespace.name`, `dt.entity.cloud:azure:storage:storageaccounts.name`, `dt.entity.cloud:azure:network:loadbalancers:basic.name`, `dt.entity.wmi:com_dynatrace_extension_ad_dra.name`, `dt.entity.kafka:producer.name`, `dt.entity.activemq:queue.name`, `dt.entity.kafka:broker.name`, `dt.entity.cloud:azure:eventgrid:domains.name`, `dt.entity.wmi:com_dynatrace_extension_ad_db.name`, `dt.entity.hyperv:host.name`, `dt.entity.azure_service_bus_queue.name`, `dt.entity.container_group.name`, `dt.entity.device_application_method_group.name`, `dt.entity.cloud:gcp:internal_http_lb_rule.name`, `dt.entity.synthetic_location.name`, `dt.entity.cloud:azure:machinelearningservices:workspaces.name`, `dt.entity.cloud:aws:trustedadvisor.name`, `dt.entity.cloud:aws:gamelift.name`, `dt.entity.cloud:aws:ec2_spot.name`, `dt.entity.aws_application_load_balancer.name`, `dt.entity.azure_mgmt_group.name`, `dt.entity.cloud:azure:insights:components.name`, `dt.entity.wmi:com_dynatrace_extension_host-observability_network_device.name`, `dt.entity.cloud:aws:redshift.name`, `dt.entity.f5:pool.name`, `dt.entity.cloud:aws:emr.name`, `dt.entity.nutanix:disk.name`, `dt.entity.cloud:aws:ec2api.name`, `dt.entity.databricks:model_serving_endpoint.name`, `dt.entity.cloud:gcp:https_lb.name`, `dt.entity.bosh_deployment.name`, `dt.entity.queue_instance.name`, `dt.entity.mariadb:database.name`, `dt.entity.nutanix:host.name`, `dt.entity.wmi:com_dynatrace_extension_ad_network.name`, `dt.entity.wmi:com_dynatrace_extension_lsa_esent.name`, `dt.entity.cloud:aws:route53resolver.name`, `dt.entity.cloud:azure:network:applicationgateways.name`, `dt.entity.cloud:aws:ssm-runcommand.name`, `dt.entity.cloud:gcp:internal_network_lb_rule.name`, `dt.entity.cloud:oci:instance_pool.name`, `dt.entity.cloud:azure:logic:integrationserviceenvironments.name`, `dt.entity.cloud:gcp:cloudsql_database.name`, `dt.entity.sql:db2_database_member.name`, `dt.entity.cloud:azure:frontdoor.name`, `dt.entity.auto_scaling_group.name`, `dt.entity.cloud:azure:web:functionslots.name`, `dt.entity.cloud:gcp:apigee_target.name`, `dt.entity.cloud:azure:containerregistry:registries.name`, `dt.entity.sql:db2_host.name`, `dt.entity.cloud:aws:mediapackagelive.name`, `dt.entity.wmi:com_dynatrace_extension_ad_ldap.name`, `dt.entity.python:com_dynatrace_extension_mongo_atlas_project.name`, `dt.entity.wmi:com_dynatrace_extension_ad_dns.name`, `dt.entity.cloud:azure:eventgrid:systemtopics.name`, `dt.entity.cisco_aci:endpoint_group.name`, `dt.entity.cloud:gcp:instance_group.name`, `dt.entity.cloud:azure:cognitiveservices:allinone.name`, `dt.entity.cloud:azure:network:natgateways.name`, `dt.entity.wmi:com_dynatrace_extension_host-observability_instance.name`, `dt.entity.aws_credentials.name`, `dt.entity.cloudhub:worker.name`, `dt.entity.cloud:aws:mediapackagevod.name`, `dt.entity.wmi:msmq_cluster_resource.name`, `dt.entity.prometheus:confluent_kafka_consumergroup.name`, `dt.entity.cloud:azure:cognitiveservices:anomalydetector.name`, `dt.entity.cloud:azure:containerinstance:containergroup.name`, `dt.entity.arquitetura_referencia:domain.name`, `dt.entity.cloud:aws:rds.name`, `dt.entity.cloud:azure:powerbidedicated:capacities.name`, `dt.entity.snmp:com_dynatrace_extension_snmp_generic_device.name`, `dt.entity.cloud:azure:datashare:accounts.name`, `dt.entity.external_synthetic_test_step.name`, `dt.entity.cloud:azure:storage:storageaccounts:file.name`, `dt.entity.cloud:gcp:gcs_bucket.name`, `dt.entity.cloud:aws:nat_gateway.name`, `dt.entity.cloud:aws:appstream.name`, `dt.entity.sql:com_dynatrace_extension_sql-oracle_cluster.name`, `dt.entity.cloud:azure:postgresql:server.name`, `dt.entity.cloud:azure:classic_storage_account:file.name`, `dt.entity.cloud:azure:automation:automationaccounts.name`, `dt.entity.cloud:aws:glue.name`, `dt.entity.service_method.name`, `dt.entity.cloud:aws:elasticache.name`, `dt.entity.cloud:azure:cognitiveservices:luisauthoring.name`, `dt.entity.cloud:azure:cognitiveservices:speech.name`, `dt.entity.cloud:azure:blockchain:blockchainmembers.name`, `dt.entity.azure_load_balancer.name`, `dt.entity.cloudhub:env.name`, `dt.entity.sql:sql_server_availability_group.name`, `dt.entity.elasticsearch:disk.name`, `dt.entity.cloud:azure:network:networkwatchers:connectionmonitors:preview.name`, `dt.entity.syslog:device.name`, `dt.entity.cloud:azure:network:dnszones.name`, `dt.entity.cloud:oci:compute.name`, `dt.entity.cloud:azure:timeseriesinsights:environments.name`, `dt.entity.sql:postgres_host.name`, `dt.entity.f5:interface.name`, `dt.entity.cisco_aci:bridge_domain.name`, `dt.entity.cloud:azure:eventhub:clusters.name`, `dt.entity.sql:sql_server_host.name`, `dt.entity.cloud:aws:sage_maker:endpoint.name`, `dt.entity.network:interface.name`, `dt.entity.snmptraps:com_dynatrace_ext_snmp-traps.name`, `dt.entity.host_group.name`, `dt.entity.cloud:gcp:filestore_instance.name`, `dt.entity.cloud:azure:cognitiveservices:computervision.name`, `dt.entity.cloud:gcp:pubsub_topic.name`, `dt.entity.azure_web_app.name`, `dt.entity.cloud:azure:sql:servers.name`, `dt.entity.f5:disk.name`, `dt.entity.f5:instance.name`, `dt.entity.cloud:azure:cognitiveservices:inkrecognizer.name`, `dt.entity.cisco_aci:cluster_element.name`, `dt.entity.cloud:azure:network:loadbalancers:gateway.name`, `dt.entity.cloud:azure:cognitiveservices:bingspellcheck.name`, `dt.entity.geolocation.name`, `dt.entity.cloud:azure:storage:storageaccounts:queue.name`, `dt.entity.cloud:aws:wafv2.name`, `dt.entity.sql:com_dynatrace_extension_sql-oracle_asm_disk.name`, `dt.entity.cloud:aws:cloudsearch.name`, `dt.entity.cloud:gcp:gae_app.name`, `dt.entity.cloud_application_namespace.name`, `dt.entity.cloud:aws:events.name`, `dt.entity.mysql:database.name`, `dt.entity.python:com_dynatrace_extension_meraki_uplink.name`, `dt.entity.sql:postgres_instance.name`, `dt.entity.hyperv:virtual_storage_device.name`, `dt.entity.vmware_datacenter.name`, `dt.entity.elasticsearch:cluster.name`, `dt.entity.elasticsearch:thread_pool.name`, `dt.entity.f5:pool:member.name`, `dt.entity.azure_sql_server.name`, `dt.entity.azure_api_management_service.name`, `dt.entity.ibmmq:local_queue.name`, `dt.entity.cloud:aws:cloudhsm.name`, `dt.entity.cloud:aws:dynamodb.name`, `dt.entity.cloud:aws:autoscaling.name`, `dt.entity.appmon_system_profile.name`, `dt.entity.cisco_aci:cnw_phys_if.name`, `dt.entity.openstack_availability_zone.name`, `dt.entity.cloud:azure:maps:accounts.name`, `dt.entity.dcrum_application.name`, `dt.entity.cloud:oci:tenant.name`, `dt.entity.wmi:com_dynatrace_extension_lsa_ntlm.name`, `dt.entity.ibmmq:queue_manager.name`, `dt.entity.kubernetes_node.name`, `dt.entity.cloud:azure:cognitiveservices:customvisionprediction.name`, `dt.entity.cloud:gcp:cloud_function.name`, `dt.entity.custom_device_group.name`, `dt.entity.wmi:com_dynatrace_extension_lsa_kerberos.name`, `dt.entity.cloud:aws:lex.name`, `dt.entity.python:com_dynatrace_extension_meraki_powersupply.name`, `dt.entity.service_method_group.name`, `dt.entity.cisco_aci:contract.name`, `dt.entity.docker_container_group.name`, `dt.entity.cloud:azure:datalakeanalytics:accounts.name`, `dt.entity.cisco_aci:private_network.name`, `dt.entity.sql:sql_server_database.name`, `dt.entity.ibmmq:remote_queue.name`, `dt.entity.cisco_aci:mgmt_if.name`, `dt.entity.cloud:azure:sql:servers:databases:datawarehouse.name`, `dt.entity.cloud:azure:devices:provisioningservices.name`, `dt.entity.python:com_dynatrace_extension_mongo_atlas_process.name`, `dt.entity.f5:gtm:virtualserver.name`, `dt.entity.cloud:azure:storage:storageaccounts:table.name`, `dt.entity.python:com_dynatrace_extension_meraki_device.name`)
+        | fieldsAdd name = coalesce(name, `dt.entity.cloud:aws:sqs.name`, `dt.entity.synthetic_test_step.name`, `dt.entity.cloud:azure:cognitiveservices:textanalytics.name`, `dt.entity.cloud:azure:appplatform:spring.name`, `dt.entity.hypervisor_cluster.name`, `dt.entity.virtualmachine.name`, `dt.entity.sql:db2_tablespace.name`, `dt.entity.cloud:aws:transfer.name`, `dt.entity.application.name`, `dt.entity.cloud:aws:cognito.name`, `dt.entity.cloud:azure:postgresql:flexibleservers.name`, `dt.entity.python:com_dynatrace_extension_apigee_organization.name`, `dt.entity.cloud:azure:appconfiguration:configurationstores.name`, `dt.entity.cloud:aws:s3.name`, `dt.entity.kafka:consumer.name`, `dt.entity.iris:instance.name`, `dt.entity.hypervisor.name`, `dt.entity.cloud:azure:web:appslots.name`, `dt.entity.cloud:azure:search:searchservices.name`, `dt.entity.dcrum_service.name`, `dt.entity.ibmmq:alias_queue.name`, `dt.entity.wmi:com_dynatrace_extension_ad_dfs.name`, `dt.entity.prometheus:confluent_kafka_topic_partition.name`, `dt.entity.cloud:aws:sns.name`, `dt.entity.cloud:azure:datalakestore:accounts.name`, `dt.entity.arquitetura_referencia:enterprise_svc.name`, `dt.entity.hyperv:storage_device.name`, `dt.entity.queue.name`, `dt.entity.openstack_vm.name`, `dt.entity.cf_foundation.name`, `dt.entity.aws_network_load_balancer.name`, `dt.entity.os.name`, `dt.entity.cisco_aci:apic.name`, `dt.entity.f5:profile.name`, `dt.entity.jenkins:node.name`, `dt.entity.ibmmq:channel.name`, `dt.entity.host.name`, `dt.entity.f5:gtm:wip.name`, `dt.entity.cloud:gcp:k8s_cluster.name`, `dt.entity.disk.name`, `dt.entity.azure_sql_elastic_pool.name`, `dt.entity.jmx:zookeeper-client.name`, `dt.entity.cloud:aws:datasync.name`, `dt.entity.cloud:gcp:cloud_run_revision.name`, `dt.entity.nutanix:storage_container.name`, `dt.entity.cloud:aws:iot_things_graph.name`, `dt.entity.cloud:azure:network:networkwatchers:connectionmonitors.name`, `dt.entity.cloud:azure:relay:namespaces.name`, `dt.entity.cloud:aws:aurora.name`, `dt.entity.cloud:azure:logic:workflows.name`, `dt.entity.cloud:aws:mediaconnect.name`, `dt.entity.cloud:azure:cognitiveservices:bingentitysearch.name`, `dt.entity.cloud:gcp:project.name`, `dt.entity.hypervisor_disk.name`, `dt.entity.runtime_component.name`, `dt.entity.cloud:azure:devices:iothubs.name`, `dt.entity.cloud:aws:transitgateway.name`, `dt.entity.cloudhub:app.name`, `dt.entity.openstack_project.name`, `dt.entity.disk-devices:software-raid.name`, `dt.entity.cloud:aws:workspaces.name`, `dt.entity.appmon_server.name`, `dt.entity.cloud:aws:elasticbeanstalk.name`, `dt.entity.cloud:aws:translate.name`, `dt.entity.network:device_group.name`, `dt.entity.mobile_application.name`, `dt.entity.cloud:azure:media:mediaservices:streamingendpoints.name`, `dt.entity.dcrum_service_instance.name`, `dt.entity.cloud:azure:servicefabricmesh:applications.name`, `dt.entity.prometheus:confluent_kafka_compute_pool.name`, `dt.entity.cloudhub:api.name`, `dt.entity.cloud:azure:recoveryservices:vaults.name`, `dt.entity.cloud:gcp:pubsub_subscription.name`, `dt.entity.external_synthetic_test.name`, `dt.entity.cloud:aws:mq.name`, `dt.entity.otel:host.name`, `dt.entity.kafka:topic.name`, `dt.entity.prometheus:com_dynatrace_extension_prometheus-rabbitmq_instance.name`, `dt.entity.cloud:aws:robomaker.name`, `dt.entity.cloud:azure:batch:account.name`, `dt.entity.ibmmq:topic.name`, `dt.entity.azure_event_hub_namespace.name`, `dt.entity.cloud:azure:app:containerapps.name`, `dt.entity.azure_subscription.name`, `dt.entity.ibmmq:buffer_pool.name`, `dt.entity.sql:com_dynatrace_extension_sql-oracle_database.name`, `dt.entity.cloud:azure:cognitiveservices:contentmoderator.name`, `dt.entity.sql:sql_server_availability_replica.name`, `dt.entity.swift_container.name`, `dt.entity.cloud:aws:kafka.name`, `dt.entity.prometheus:com_dynatrace_extension_prometheus-rabbitmq_host.name`, `dt.entity.wmsshipping:truck.name`, `dt.entity.cloud:gcp:autoscaler.name`, `dt.entity.cloud:gcp:apigee_proxy.name`, `dt.entity.remote_unix:host.name`, `dt.entity.cloud:azure:network:privatednszones.name`, `dt.entity.cloud:azure:cdn:cdnwebapplicationfirewallpolicies.name`, `dt.entity.cloud:aws:workmail.name`, `dt.entity.cloud:aws:storagegateway.name`, `dt.entity.cloud:aws:qldb.name`, `dt.entity.f5:gtm:profile.name`, `dt.entity.cloud:aws:opsworks.name`, `dt.entity.cloud:azure:notificationhubs:namespaces:notificationhubs.name`, `dt.entity.logistics:trucks.name`, `dt.entity.cloud:azure:classic_virtual_machine.name`, `dt.entity.azure_storage_account.name`, `dt.entity.cloud:gcp:k8s_pod.name`, `dt.entity.cloud:aws:elasticinference.name`, `dt.entity.cloud:aws:connect.name`, `dt.entity.cloud:aws:chatbot.name`, `dt.entity.hsm:luna_device.name`, `dt.entity.databricks:cluster.name`, `dt.entity.wmi:com_dynatrace_extension_ad_instance.name`, `dt.entity.cinder_volume.name`, `dt.entity.nutanix:virtual_disk.name`, `dt.entity.arquitetura_referencia:macro_functional_group.name`, `dt.entity.elastic_load_balancer.name`, `dt.entity.cisco_aci:epg_contract.name`, `dt.entity.ebs_volume.name`, `dt.entity.activemq:broker.name`, `dt.entity.python:certificate_monitor.name`, `dt.entity.dynamo_db_table.name`, `dt.entity.sql:com_dynatrace_extension_sql-oracle_backup_job.name`, `dt.entity.sql:hana_db_service.name`, `dt.entity.application_method.name`, `dt.entity.nutanix:network.name`, `dt.entity.cloud:azure:classic_storage_account:blob.name`, `dt.entity.cloud:gcp:pubsub_snapshot.name`, `dt.entity.cloud:gcp:apigee_environment.name`, `dt.entity.cisco_aci:bridge_domain_to_epg.name`, `dt.entity.databricks:workspace.name`, `dt.entity.s3bucket.name`, `dt.entity.cloud:azure:synapse:workspaces:bigdatapools.name`, `dt.entity.ec2_instance.name`, `dt.entity.cloud:azure:netapp:netappaccounts:capacitypools.name`, `dt.entity.cloud:aws:api_gateway.name`, `dt.entity.snmp:com_dynatrace_extension_snmp_generic_device_interface.name`, `dt.entity.cloud:aws:states.name`, `dt.entity.openstack_compute_node.name`, `dt.entity.cloud:azure:cognitiveservices:face.name`, `dt.entity.sql:db2_instance.name`, `dt.entity.cloud:azure:sql:servers:databases:vcore.name`, `dt.entity.cloud:aws:neptune.name`, `dt.entity.cloud:aws:waf.name`, `dt.entity.wmi:msmq_service_instance.name`, `dt.entity.sql:postgres_database.name`, `dt.entity.http_check_step.name`, `dt.entity.cloud:azure:network:azurefirewalls.name`, `dt.entity.cloud:azure:kusto:clusters.name`, `dt.entity.cloud:azure:network:publicipaddresses.name`, `dt.entity.aws_availability_zone.name`, `dt.entity.cloud:azure:containerservice:managedcluster.name`, `dt.entity.disk-devices:volume.name`, `dt.entity.cloudhub:org.name`, `dt.entity.cloud:aws:mediaconvert.name`, `dt.entity.cloud:aws:ecs:cluster.name`, `dt.entity.cloud:azure:mysql:flexibleservers.name`, `dt.entity.cloud:azure:cognitiveservices:openai.name`, `dt.entity.apm_security_gateway.name`, `dt.entity.cloud:aws:route53.name`, `dt.entity.azure_event_hub.name`, `dt.entity.cloud:azure:traffic_manager_profile.name`, `dt.entity.cloud:aws:swf.name`, `dt.entity.cloud:aws:appsync.name`, `dt.entity.cloud:azure:cognitiveservices:customvisiontraining.name`, `dt.entity.cisco_aci:fabric_node.name`, `dt.entity.cloud:azure:sql:servers:elasticpools:dtu.name`, `dt.entity.wmi:com_dynatrace_extension_ad_domain.name`, `dt.entity.cloud_application_instance.name`, `dt.entity.prometheus:confluent_kafka_schema_registry.name`, `dt.entity.azure_cosmos_db.name`, `dt.entity.process_group_instance.name`, `dt.entity.cloud:azure:cache:redis.name`, `dt.entity.cloud:gcp:pubsublite_topic_partition.name`, `dt.entity.cloud:aws:sage_maker:ground_truth.name`, `dt.entity.kubernetes_service.name`, `dt.entity.network:port.name`, `dt.entity.elasticsearch:index.name`, `dt.entity.azure_function_app.name`, `dt.entity.container_group_instance.name`, `dt.entity.cloud:azure:cognitiveservices:qnamaker.name`, `dt.entity.cloud:azure:sql:servers:databases:dtu.name`, `dt.entity.cloud:azure:storage:storageaccounts:blob.name`, `dt.entity.cloud:azure:classic_storage_account:table.name`, `dt.entity.cloud:gcp:network_lb_rule.name`, `dt.entity.cloud:azure:sql:servers:databases:hyperscale.name`, `dt.entity.cloud:azure:mariadb:server.name`, `dt.entity.cloud:azure:network:loadbalancers:standard.name`, `dt.entity.custom:host.name`, `dt.entity.wmi:com_dynatrace_extension_host-observability_disk.name`, `dt.entity.cloud:azure:documentdb:databaseaccounts:global.name`, `dt.entity.hyperv:cluster.name`, `dt.entity.azure_service_bus_namespace.name`, `dt.entity.sql:sql_server_availability_database.name`, `dt.entity.azure_vm_scale_set.name`, `dt.entity.wmi:msmq_service_instance_queue.name`, `dt.entity.docker_container_group_instance.name`, `dt.entity.cloud:gcp:k8s_node.name`, `dt.entity.http_check.name`, `dt.entity.python:com_dynatrace_extension_meraki_network.name`, `dt.entity.mariadb:instance.name`, `dt.entity.os:service.name`, `dt.entity.cloud:aws:es.name`, `dt.entity.openstack_region.name`, `dt.entity.cisco_aci:system.name`, `dt.entity.cloud:azure:iotcentral:iotapps.name`, `dt.entity.cloud:aws:eks:cluster.name`, `dt.entity.cloud:azure:virtual_network_gateway.name`, `dt.entity.browser.name`, `dt.entity.cloud:aws:ses.name`, `dt.entity.cloud:aws:rekognition.name`, `dt.entity.cloud_application.name`, `dt.entity.device_application_method.name`, `dt.entity.cloud:aws:codebuild.name`, `dt.entity.cloud:azure:timeseriesinsights:eventsources.name`, `dt.entity.cloud:azure:sql:servers:elasticpools:vcore.name`, `dt.entity.nutanix:vm.name`, `dt.entity.cloud:aws:efs.name`, `dt.entity.prometheus:confluent_kafka_topic.name`, `dt.entity.cloud:azure:storagesync:storagesyncservices.name`, `dt.entity.synthetic_test.name`, `dt.entity.cloud:aws:sage_maker:endpoint_instance.name`, `dt.entity.ibmmq:pageset.name`, `dt.entity.cloud:aws:athena.name`, `dt.entity.snmp:com_dynatrace_extension_snmp_generic_cisco_device.name`, `dt.entity.application_method_group.name`, `dt.entity.cloud:aws:iot.name`, `dt.entity.cloud:azure:signalrservice:signalr.name`, `dt.entity.cloud:azure:documentdb:databaseaccounts:mongo.name`)
+        | fieldsAdd name = coalesce(name, `dt.entity.cloud:aws:kinesis:data_analytics.name`, `dt.entity.cloud:aws:polly.name`, `dt.entity.cloud:gcp:tpu_worker.name`, `dt.entity.jmx:zookeeper.name`, `dt.entity.cloud:azure:cognitiveservices:luis.name`, `dt.entity.cloud:azure:cognitiveservices:translator.name`, `dt.entity.azure_credentials.name`, `dt.entity.wmi:com_dynatrace_extension_ad_atq.name`, `dt.entity.azure_region.name`, `dt.entity.azure_app_service_plan.name`, `dt.entity.cloud:azure:cognitiveservices:bingsearch.name`, `dt.entity.f5:gtm:pool.name`, `dt.entity.sql:com_dynatrace_extension_sql-oracle_instance.name`, `dt.entity.cloud:aws:acmprivateca.name`, `dt.entity.sql:com_dynatrace_extension_sql-oracle_asm_disk_group.name`, `dt.entity.python:certificate_monitor_certificate.name`, `dt.entity.custom_device.name`, `dt.entity.cloud:azure:web:hostingenvironments:v2.name`, `dt.entity.cloud:azure:network:expressroutecircuits.name`, `dt.entity.cloud:azure:datafactory:v2.name`, `dt.entity.cloud:azure:datafactory:v1.name`, `dt.entity.disk-devices:partition.name`, `dt.entity.cloud:aws:servicecatalog.name`, `dt.entity.cloud:aws:app_runner.name`, `dt.entity.cloud:azure:app:managedenvironments.name`, `dt.entity.prometheus:confluent_kafka_connector.name`, `dt.entity.service.name`, `dt.entity.network:device.name`, `dt.entity.cloud:gcp:gce_instance.name`, `dt.entity.cloud:aws:inspector.name`, `dt.entity.azure_redis_cache.name`, `dt.entity.cloud:azure:eventgrid:topics.name`, `dt.entity.cloud:azure:cognitiveservices:immersivereader.name`, `dt.entity.python:com_dynatrace_extension_apigee_apiproxy.name`, `dt.entity.arquitetura_referencia:app_svc.name`, `dt.entity.cloud:aws:sage_maker:training_job.name`, `dt.entity.cisco_aci:l1_phys_if.name`, `dt.entity.datastore.name`, `dt.entity.neutron_subnet.name`, `dt.entity.cloud:aws:textract.name`, `dt.entity.cloud:aws:kinesis:data_firehose.name`, `dt.entity.cloud:aws:elastictranscoder.name`, `dt.entity.cloud:azure:sql:managed.name`, `dt.entity.aws_lambda_function.name`, `dt.entity.relational_database_service.name`, `dt.entity.cloud:azure:synapse:workspaces:sqlpools.name`, `dt.entity.cloud:gcp:pubsublite_subscription_partition.name`, `dt.entity.f5:rule.name`, `dt.entity.azure_vm.name`, `dt.entity.cloud:azure:cognitiveservices:bingautosuggest.name`, `dt.entity.vcenter.name`, `dt.entity.cloud:aws:ebs.name`, `dt.entity.cloud:azure:hdinsight:cluster.name`, `dt.entity.cisco_aci:tenant.name`, `dt.entity.cloud:azure:apimanagement:service.name`, `dt.entity.azure_service_bus_topic.name`, `dt.entity.ibmmq:listener.name`, `dt.entity.cloud:aws:kinesis:video_stream.name`, `dt.entity.cloud:aws:cloud_front.name`, `dt.entity.cloud:azure:mysql:server.name`, `dt.entity.cloud:aws:cassandra.name`, `dt.entity.azure_application_gateway.name`, `dt.entity.wmsshipping:container.name`, `dt.entity.cloud:azure:classic_storage_account:queue.name`, `dt.entity.cloud:aws:billing.name`, `dt.entity.python:com_dynatrace_extension_mongo_atlas_cluster.name`, `dt.entity.cloud:aws:ecs.name`, `dt.entity.azure_sql_database.name`, `dt.entity.custom_application.name`, `dt.entity.sql:hana_db_host.name`, `dt.entity.snmp:com_dynatrace_extension_snmp_generic_cisco_network_interface.name`, `dt.entity.cisco_aci:app_profile.name`, `dt.entity.cisco_aci:fabric_pod.name`, `dt.entity.mysql:instance.name`, `dt.entity.cloud:aws:dax.name`, `dt.entity.f5:virtualserver.name`, `dt.entity.sql:sql_server_instance.name`, `dt.entity.cloud:aws:lambda.name`, `dt.entity.software_component.name`, `dt.entity.akamai-siem:config.name`, `dt.entity.cloud:gcp:tcp_ssl_proxy_rule.name`, `dt.entity.cloud:azure:cognitiveservices:personalizer.name`, `dt.entity.kubernetes_cluster.name`, `dt.entity.jmx:zookeeper-replica.name`)
+        | fieldsAdd dt_entity_type = coalesce(smartscape.affected_entity.types, affected_entity_types)
+        | fieldsKeep name, dt_entity_type, "*.name", "dt.*", "smartscape.*", entity_tags, "primary_tags.*", CARTS_KB, CARTS_Priority, timestamp
+        | lookup [load "/lookups/dt_to_snow_cmdb_mapping"], sourceField: dt_entity_type[0], lookupField: dt_entity_type, fields: {now_ci_type, sgc_supported}
+        | fieldsAdd name = if(sgc_supported, concat(name, " - ", toString(dt.smartscape_source.id)), else: name)
+    name: extract_events
+    position:
+      x: 0
+      "y": 1
+    predecessors: []
+  send_event_to_servicenow:
+    action: dynatrace.servicenow:snow-create-record
+    active: true
+    concurrency: 1
+    conditions:
+      states:
+        extract_events: SUCCESS
+    description: 'Create one em_event in ServiceNow. Handles open, update and close: message_key is the stable Dynatrace problem event ID, so ServiceNow Event Management dedupes and reopens automatically, and severity 0 (Clear) on problem close resolves the alert.'
+    input:
+      connectionId: vu9U3hXa3q0AAAABACNhcHA6ZHluYXRyYWNlLnNlcnZpY2Vub3c6Y29ubmVjdGlvbgAGdGVuYW50AAZ0ZW5hbnQAJGY2YzBkZDM2LWUxNmYtM2MwNi04YTYzLTY2NjQ5MTBkMTNhNL7vVN4V2t6t
+      fields:
+        - id: f-message-key
+          key: message_key
+          value: '{{ event()[''event.id''] }}'
+        - id: f-source
+          key: source
+          value: '{{ input(''snow_source'') }}'
+        - id: f-severity
+          key: severity
+          value: '{{ 0 if event()[''event.status''] == ''CLOSED'' else event()[''event.severity''] }}'
+        - id: f-event-class
+          key: event_class
+          value: '{{ event()[''event.category''] }}'
+        - id: f-resource
+          key: resource
+          value: '{{ result("extract_events")["records"][0]["name"] }}'
+        - id: f-metric-name
+          key: metric_name
+          value: '{{ event()[''event.name''] }}'
+        - id: f-description
+          key: description
+          value: '[{{ event()[''display_id''] }}] {{ event()[''event.name''] }} — {{ event()[''event.description''] | default('''', true) | truncate(900, true) }}'
+        - id: f-node
+          key: node
+          value: '{{_.item["name"]}}'
+        - id: f-additional-info
+          key: additional_info
+          value: '{{ result("extract_events")["records"][0]}}'
+        - id: d84e5762-cd8a-49e7-9dc6-42778a295d21
+          key: ci_type
+          value: '{{ result("extract_events")["records"][0]["now_ci_type"]}}'
+        - id: 3032ace4-3dfd-4c1c-b96b-884db26f5498
+          key: type
+          value: '{{ result("extract_events")["records"][0]["now_ci_type"]}}'
+      tableName: '{{ input(''snow_table'') }}'
+    name: send_event_to_servicenow
+    position:
+      x: 0
+      "y": 2
+    predecessors:
+      - extract_events
+    withItems: item in {{result("extract_events")["records"]}}
