@@ -5,6 +5,9 @@
 set -euo pipefail
 
 OUT="${1:-ground-truth/dt-entity-keys.csv}"
+TMPOUT="$(mktemp)"
+trap "rm -f '$TMPOUT'" EXIT
+
 mkdir -p "$(dirname "$OUT")"
 
 dtctl query 'fetch dt.system.data_objects
@@ -19,11 +22,18 @@ dtctl query 'fetch dt.system.data_objects
 import json, sys, csv
 d = json.load(sys.stdin)
 res = d.get("result")
+if res is None or (isinstance(res, dict) and "records" not in res and not isinstance(res, list)):
+    sys.stderr.write("ERROR: empty or unexpected result from dtctl query\n")
+    sys.exit(1)
 rows = res.get("records", []) if isinstance(res, dict) else (res or [])
+if not rows:
+    sys.stderr.write("ERROR: zero data rows returned from dtctl query\n")
+    sys.exit(1)
 w = csv.writer(sys.stdout)
 w.writerow(["dt_entity_key", "namespace", "source_type"])
 for r in rows:
     w.writerow([r["dt_entity_key"], r["namespace"], "classic"])
-' > "$OUT"
+' > "$TMPOUT"
 
+mv "$TMPOUT" "$OUT"
 echo "wrote $(( $(wc -l < "$OUT") - 1 )) rows to $OUT"

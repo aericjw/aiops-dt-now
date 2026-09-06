@@ -6,18 +6,25 @@ set -euo pipefail
 
 OUT="${1:-ground-truth/snow-ci-classes.csv}"
 AUTH="${2:-pdi}"
+TMPOUT="$(mktemp)"
+trap "rm -f '$TMPOUT'" EXIT
+
 mkdir -p "$(dirname "$OUT")"
 
-npx --yes @servicenow/sdk query sys_db_object \
+npx --yes @servicenow/sdk@4.11.2 query sys_db_object \
   -q 'nameSTARTSWITHcmdb_ci' --limit 2000 -f name,label -o json -a "$AUTH" \
 | python3 -c '
 import json, sys, csv
 d = json.load(sys.stdin)
 rows = d.get("records", [])
+if not rows:
+    sys.stderr.write("ERROR: zero data rows returned from ServiceNow query\n")
+    sys.exit(1)
 w = csv.writer(sys.stdout)
 w.writerow(["class_name", "label"])
 for r in sorted(rows, key=lambda x: x["name"]):
     w.writerow([r["name"], (r.get("label") or "").replace("\n", " ")])
-' > "$OUT"
+' > "$TMPOUT"
 
+mv "$TMPOUT" "$OUT"
 echo "wrote $(( $(wc -l < "$OUT") - 1 )) rows to $OUT"
