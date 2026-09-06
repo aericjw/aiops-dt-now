@@ -1,0 +1,8 @@
+fetch dt.davis.events, from:-24h
+| fieldsAdd raw = coalesce(smartscape.affected_entity.types, affected_entity_types)
+| expand raw
+| fieldsAdd dt_entity_key = if(isNull(raw), "__unknown__",
+    else: lower(if(startsWith(raw, "dt.entity."), substring(raw, from: 10), else: raw)))
+| summarize events = count(), raw_forms = collectDistinct(raw), by: {dt_entity_key}
+| filter arraySize(raw_forms) > 1
+| sort events desc

@@ -1,0 +1,15 @@
+// Coverage check: for every distinct dt_entity_key observed on live Davis
+// events in the window, confirm the v2 mapping table resolves now_ci_class
+// and bind_strategy. Any row with a null in either column means the lookup
+// table is missing that entity key and extract_events.dql will ship a null
+// bind for it.
+fetch dt.davis.events, from:-24h
+| fieldsAdd raw = arrayFirst(coalesce(smartscape.affected_entity.types, affected_entity_types))
+| fieldsAdd dt_entity_key = if(isNull(raw), "__unknown__",
+    else: lower(if(startsWith(raw, "dt.entity."), substring(raw, from: 10), else: raw)))
+| summarize events = count(), by: {dt_entity_key}
+| lookup [load "/lookups/dt_to_snow_cmdb_mapping_v2"],
+    sourceField: dt_entity_key, lookupField: dt_entity_key,
+    fields: {now_ci_class, bind_strategy}
+| filter isNull(now_ci_class) or isNull(bind_strategy)
+| sort events desc
