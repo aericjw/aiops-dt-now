@@ -1,25 +1,56 @@
-import sys, pathlib
+import csv
+import sys
+import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
 from make_partitions import assign_unit, UNITS
 
-ALL = [
-    ("cloud:azure:web:serverfarms", "cloud"),
-    ("cloud:aws:sqs", "cloud"),
-    ("cloud:gcp:project", "cloud"),
-    ("cloud:oci:compute", "cloud"),
-    ("host", "__core__"),
-    ("sql:postgres_db", "sql"),
-    ("mysql:instance", "mysql"),
-    ("wmi:com_dynatrace_extension_ad_dhcp", "wmi"),
-    ("f5:instance", "f5"),
-    ("python:com_dynatrace_extension_meraki_device", "python"),
-]
 
+def test_ground_truth_coverage_and_exhaustiveness():
+    """Verify all 533 keys are classified, counts match expected, no overlaps."""
+    repo_root = pathlib.Path(__file__).resolve().parents[1]
+    csv_path = repo_root / "ground-truth" / "dt-entity-keys.csv"
 
-def test_every_key_lands_in_exactly_one_unit():
-    for key, ns in ALL:
-        units = [u for u in UNITS if assign_unit(key, ns) == u["id"]]
-        assert len(units) == 1, f"{key} matched {len(units)} units"
+    # Read all keys from ground truth
+    all_keys = []
+    per_unit_keys = {u["id"]: [] for u in UNITS}
+
+    with open(csv_path, newline="", encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            key = row["dt_entity_key"].strip()
+            namespace = row["namespace"].strip()
+            all_keys.append(key)
+            unit_id = assign_unit(key, namespace)
+            per_unit_keys[unit_id].append(key)
+
+    # Verify total count
+    assert len(all_keys) == 533, f"Expected 533 keys, got {len(all_keys)}"
+
+    # Verify per-unit counts match expected
+    unit_id_to_expected = {u["id"]: u["expected"] for u in UNITS}
+    for unit_id in sorted(per_unit_keys.keys()):
+        actual_count = len(per_unit_keys[unit_id])
+        expected_count = unit_id_to_expected[unit_id]
+        assert actual_count == expected_count, (
+            f"Unit {unit_id}: expected {expected_count} keys, got {actual_count}"
+        )
+
+    # Verify all returned ids are in UNITS
+    valid_ids = {u["id"] for u in UNITS}
+    for unit_id in per_unit_keys.keys():
+        assert unit_id in valid_ids, f"Unit id {unit_id} not found in UNITS"
+
+    # Verify no duplicates across units (no key in multiple units)
+    all_classified_keys = []
+    for keys_list in per_unit_keys.values():
+        all_classified_keys.extend(keys_list)
+    assert len(all_classified_keys) == len(set(all_classified_keys)), (
+        "Found duplicate keys across units (one key classified into multiple units)"
+    )
+
+    # Verify union equals input (no key missing)
+    assert set(all_classified_keys) == set(all_keys), (
+        "Classified keys do not match input keys"
+    )
 
 
 def test_specific_assignments():
