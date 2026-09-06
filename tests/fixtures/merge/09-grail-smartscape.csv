@@ -1,0 +1,3 @@
+dt_entity_key,now_ci_class,bind_strategy,sgc_managed
+k8s_pod,cmdb_ci_kubernetes_pod,ire_correlated,false
+process,cmdb_ci_appl,sgc_process,true

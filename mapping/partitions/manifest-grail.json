@@ -1,0 +1,17 @@
+{
+  "units": [
+    {
+      "id": "09",
+      "slug": "grail-smartscape",
+      "keys_file": "mapping/partitions/09-grail-smartscape.keys.txt",
+      "output_file": "mapping/partitions/09-grail-smartscape.csv",
+      "expected": 19,
+      "target_families": [
+        "cmdb_ci_kubernetes_*",
+        "cmdb_ci_db_*",
+        "cmdb_ci_web_application",
+        "cmdb_ci"
+      ]
+    }
+  ]
+}

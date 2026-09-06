@@ -1,0 +1,3 @@
+dt_entity_key,now_ci_class,bind_strategy,sgc_managed
+host,cmdb_ci_computer,sgc_host,true
+service,cmdb_ci_service_calculated,sgc_service,true

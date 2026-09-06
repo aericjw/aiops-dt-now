@@ -55,6 +55,17 @@ def test_bad_sgc_managed_is_rejected():
     assert any("maybe" in e for e in errs)
 
 
+def test_key_union_covers_classic_and_grail_only_keys():
+    """The validator's key set is a union of two vocabularies: classic
+    dt.entity.* keys (e.g. host) and Grail-only Smartscape keys (e.g.
+    k8s_pod, which is not a dt.entity.* type). Both must validate together."""
+    classic_only = "host"
+    grail_only = "k8s_pod"
+    union_keys = {classic_only, grail_only, "__unknown__"}
+    rows = [row(classic_only), row(grail_only), row("__unknown__")]
+    assert validate(rows, union_keys, CLASSES) == []
+
+
 def test_bind_strategy_enum_matches_spec():
     assert BIND_STRATEGIES == {
         "sgc_service", "sgc_host", "sgc_process", "ire_correlated"}
@@ -75,7 +86,8 @@ def test_cli_valid_mapping_exits_zero():
         ["python3", "scripts/validate_mapping.py",
          str(fixtures_dir() / "mapping-valid.csv"),
          str(fixtures_dir() / "ground-truth-keys.csv"),
-         str(fixtures_dir() / "ground-truth-classes.csv")],
+         str(fixtures_dir() / "ground-truth-classes.csv"),
+         str(fixtures_dir() / "ground-truth-smartscape.csv")],
         cwd="/Users/aeric/Projects/aiops-dt-now",
         capture_output=True, text=True
     )
@@ -89,7 +101,8 @@ def test_cli_nonexistent_class_exits_one():
         ["python3", "scripts/validate_mapping.py",
          str(fixtures_dir() / "mapping-bad-class.csv"),
          str(fixtures_dir() / "ground-truth-keys.csv"),
-         str(fixtures_dir() / "ground-truth-classes.csv")],
+         str(fixtures_dir() / "ground-truth-classes.csv"),
+         str(fixtures_dir() / "ground-truth-smartscape.csv")],
         cwd="/Users/aeric/Projects/aiops-dt-now",
         capture_output=True, text=True
     )
@@ -104,7 +117,8 @@ def test_cli_missing_columns_exits_one_and_reports():
         ["python3", "scripts/validate_mapping.py",
          str(fixtures_dir() / "mapping-missing-columns.csv"),
          str(fixtures_dir() / "ground-truth-keys.csv"),
-         str(fixtures_dir() / "ground-truth-classes.csv")],
+         str(fixtures_dir() / "ground-truth-classes.csv"),
+         str(fixtures_dir() / "ground-truth-smartscape.csv")],
         cwd="/Users/aeric/Projects/aiops-dt-now",
         capture_output=True, text=True
     )
@@ -124,7 +138,8 @@ def test_cli_unknown_sentinel_is_added_by_main():
         ["python3", "scripts/validate_mapping.py",
          str(fixtures_dir() / "mapping-valid.csv"),
          str(fixtures_dir() / "ground-truth-keys.csv"),
-         str(fixtures_dir() / "ground-truth-classes.csv")],
+         str(fixtures_dir() / "ground-truth-classes.csv"),
+         str(fixtures_dir() / "ground-truth-smartscape.csv")],
         cwd="/Users/aeric/Projects/aiops-dt-now",
         capture_output=True, text=True
     )
@@ -132,3 +147,19 @@ def test_cli_unknown_sentinel_is_added_by_main():
     # The mapping-valid.csv includes __unknown__ explicitly, so it should pass
     # without any "not a known entity type" error for __unknown__
     assert "not a known entity type" not in result.stderr
+
+
+def test_cli_smartscape_keys_are_included_in_valid_set():
+    """A mapping that covers a Grail-only Smartscape key (not in the classic
+    ground-truth file) should validate, because main() unions both files."""
+    result = subprocess.run(
+        ["python3", "scripts/validate_mapping.py",
+         str(fixtures_dir() / "mapping-with-smartscape-key.csv"),
+         str(fixtures_dir() / "ground-truth-keys.csv"),
+         str(fixtures_dir() / "ground-truth-classes.csv"),
+         str(fixtures_dir() / "ground-truth-smartscape-sample.csv")],
+        cwd="/Users/aeric/Projects/aiops-dt-now",
+        capture_output=True, text=True
+    )
+    assert result.returncode == 0, f"Expected exit 0, got {result.returncode}. stderr: {result.stderr}"
+    assert "PASS" in result.stdout

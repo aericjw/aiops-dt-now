@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Merge the eight research partitions into one mapping file.
+"""Merge the nine research partitions into one mapping file.
+
+Units 01-08 are the classic dt.entity.* partitions from mapping/partitions/
+manifest.json. Unit 09 is the Grail Smartscape partition, tracked in a
+separate manifest-grail.json (rather than being folded into manifest.json)
+because manifest.json is regenerated wholesale by scripts/make_partitions.py
+from the 533-key classic ground truth and would silently drop a 09 entry on
+regeneration.
 
 Appends the __unknown__ row, which no unit owns because it is not a real entity
 type -- it is the sentinel emitted when a Davis event carries no entity type at
@@ -19,13 +26,26 @@ UNKNOWN_ROW = {
 }
 
 
-def main():
-    manifest = json.loads(
-        pathlib.Path("mapping/partitions/manifest.json").read_text(encoding="utf-8"))
-    out = pathlib.Path("mapping/dt_to_snow_cmdb_mapping.csv")
+MANIFESTS = [
+    "mapping/partitions/manifest.json",
+    "mapping/partitions/manifest-grail.json",
+]
+
+
+def main(argv=None):
+    argv = sys.argv if argv is None else argv
+    manifest_paths = argv[1:3] if len(argv) > 2 else MANIFESTS
+    out_path = argv[3] if len(argv) > 3 else "mapping/dt_to_snow_cmdb_mapping.csv"
+
+    units = []
+    for manifest_path in manifest_paths:
+        manifest = json.loads(pathlib.Path(manifest_path).read_text(encoding="utf-8"))
+        units.extend(manifest["units"])
+
+    out = pathlib.Path(out_path)
 
     rows, seen, errors = [], set(), []
-    for unit in manifest["units"]:
+    for unit in units:
         path = pathlib.Path(unit["output_file"])
         if not path.exists():
             errors.append(f"missing partition output: {path}")
@@ -61,4 +81,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv))

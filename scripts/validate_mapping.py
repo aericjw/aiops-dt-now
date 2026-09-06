@@ -62,7 +62,8 @@ def _load_column(path, column):
 def main(argv):
     if len(argv) < 2:
         print("usage: validate_mapping.py <mapping.csv> "
-              "[dt-entity-keys.csv] [snow-ci-classes.csv]", file=sys.stderr)
+              "[dt-entity-keys.csv] [snow-ci-classes.csv] "
+              "[dt-smartscape-types.csv]", file=sys.stderr)
         return 2
 
     mapping_path = pathlib.Path(argv[1])
@@ -70,6 +71,8 @@ def main(argv):
                              else "ground-truth/dt-entity-keys.csv")
     classes_path = pathlib.Path(argv[3] if len(argv) > 3
                                 else "ground-truth/snow-ci-classes.csv")
+    smartscape_path = pathlib.Path(argv[4] if len(argv) > 4
+                                   else "ground-truth/dt-smartscape-types.csv")
 
     with open(mapping_path, newline="", encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
@@ -80,7 +83,13 @@ def main(argv):
             return 1
         rows = list(reader)
 
-    valid_keys = _load_column(keys_path, "dt_entity_key") | {"__unknown__"}
+    # The valid key universe is the union of classic dt.entity.* types and
+    # Smartscape-on-Grail types -- two separate topology vocabularies that
+    # together cover every dt_entity_key a Davis event can carry. Union, not
+    # sum, because a handful of keys (host, service, disk, ...) exist in both.
+    valid_keys = (_load_column(keys_path, "dt_entity_key")
+                  | _load_column(smartscape_path, "dt_entity_key")
+                  | {"__unknown__"})
     valid_classes = _load_column(classes_path, "class_name")
 
     errors = validate(rows, valid_keys, valid_classes)

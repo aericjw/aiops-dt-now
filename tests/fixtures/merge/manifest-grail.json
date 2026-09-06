@@ -1,0 +1,12 @@
+{
+  "units": [
+    {
+      "id": "09",
+      "slug": "grail-smartscape",
+      "keys_file": "09-grail-smartscape.keys.txt",
+      "output_file": "09-grail-smartscape.csv",
+      "expected": 2,
+      "target_families": ["cmdb_ci"]
+    }
+  ]
+}

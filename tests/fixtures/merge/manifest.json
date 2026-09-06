@@ -1,0 +1,12 @@
+{
+  "units": [
+    {
+      "id": "01",
+      "slug": "unit-a",
+      "keys_file": "unit-a.keys.txt",
+      "output_file": "unit-a.csv",
+      "expected": 2,
+      "target_families": ["cmdb_ci"]
+    }
+  ]
+}
