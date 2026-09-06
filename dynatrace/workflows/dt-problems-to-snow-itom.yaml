@@ -9,7 +9,7 @@ isPrivate: false
 schemaVersion: 4
 trigger:
   eventTrigger:
-    filterQuery: event.kind == "DAVIS_PROBLEM" AND dt.analysis.ready == true AND (matchesValue(event.category, {"MONITORING_UNAVAILABLE", "AVAILABILITY", "ERROR", "SLOWDOWN", "RESOURCE_CONTENTION", "CUSTOM_ALERT", "INFO"})) AND (matchesValue(k8s.cluster.name, "aeric-walls-aks"))
+    filterQuery: event.kind == "DAVIS_PROBLEM" AND dt.analysis.ready == true AND (matchesValue(event.category, {"MONITORING_UNAVAILABLE", "AVAILABILITY", "ERROR", "SLOWDOWN", "RESOURCE_CONTENTION", "CUSTOM_ALERT", "INFO"}))
     isActive: true
     triggerConfiguration:
       type: davis-problem
@@ -23,7 +23,7 @@ trigger:
           monitoringUnavailable: true
           resource: true
           slowdown: true
-        customFilter: matchesValue(k8s.cluster.name, "aeric-walls-aks")
+        customFilter: ""
         entityTags: {}
         entityTagsMatch: null
         onProblemClose: true
@@ -41,6 +41,7 @@ type: STANDARD
 input:
   snow_source: Dynatrace
   snow_table: em_event
+  scope_filter: ""
 hourlyExecutionLimit: 1000
 tasks:
   extract_events:
