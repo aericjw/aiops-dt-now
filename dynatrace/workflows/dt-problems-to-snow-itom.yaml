@@ -66,11 +66,18 @@ tasks:
         | fieldsAdd dt_entity_name = coalesce(getNodeName(dt.smartscape_source.id), arrayFirst(affected_entity_names))
         | fieldsAdd dt_problem_display_id = "{{ event()['display_id'] }}"
         | fieldsAdd dt_problem_url = concat("https://bwm98081.apps.dynatrace.com/ui/apps/dynatrace.davis.problems/problem/", "{{ event()['event.id'] }}")
-        | lookup [load "/lookups/dt_to_snow_cmdb_mapping_v3"],
+        | lookup [load "/lookups/dt_to_snow_cmdb_mapping_v4"],
             sourceField: dt_entity_key, lookupField: dt_entity_key,
             fields: {now_ci_class, bind_strategy, sgc_managed}
+        | lookup [ smartscapeEdges "runs_on", from:-24h
+            | fieldsAdd s = toString(source_id), t = toString(target_id)
+            | filter startsWith(s, "PROCESS-") and startsWith(t, "HOST-")
+            | fieldsAdd host_name = getNodeName(target_id)
+            | fields s, host_name ],
+            sourceField: dt_entity_id, lookupField: s, fields: {host_name}
         | fieldsAdd dt_ci_name = if(bind_strategy == "sgc_service" and isNotNull(dt_entity_name), concat(dt_entity_name, " - ", dt_entity_id),
-            else: dt_entity_name)
+            else: if(bind_strategy == "sgc_process" and isNotNull(dt_entity_name) and isNotNull(host_name), concat(dt_entity_name, "@", host_name),
+            else: dt_entity_name))
         | fields event.id, event.name, event.category, event.severity, event.status,
             event.description, dt_entity_key, dt_entity_id, dt_entity_name, dt_ci_name,
             now_ci_class, bind_strategy, sgc_managed,

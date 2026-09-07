@@ -456,7 +456,7 @@ os,cmdb_ci,ire_correlated,false
 os:service,cmdb_ci_appl,ire_correlated,false
 otel:host,cmdb_ci,ire_correlated,false
 otel:process,cmdb_ci_appl,ire_correlated,false
-process,cmdb_ci_appl,ire_correlated,true
+process,cmdb_ci_appl,sgc_process,true
 process_group,cmdb_ci_appl,ire_correlated,false
 process_group_instance,cmdb_ci_appl,ire_correlated,false
 prometheus:com_dynatrace_extension_prometheus-rabbitmq_host,cmdb_ci_appl_rabbitmq,ire_correlated,false

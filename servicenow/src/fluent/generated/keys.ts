@@ -17,6 +17,10 @@ declare global {
                         table: 'em_match_rule'
                         id: 'acbe8a2c8e6140158334a1be961882b2'
                     }
+                    'dt-bind-sgc-process': {
+                        table: 'em_match_rule'
+                        id: '5910fd65b56e4b739f9305e250e351e0'
+                    }
                     'dt-bind-sgc-service': {
                         table: 'em_match_rule'
                         id: 'c40c1fe9cbe5430682f3d90969cdb638'
