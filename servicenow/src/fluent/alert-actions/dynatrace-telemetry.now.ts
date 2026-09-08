@@ -66,7 +66,16 @@ Record({
         // -- see task-13-report.md); 8100 does not collide with it or with
         // any other row (all OOB samples sit at order 10-200).
         order: 8100,
-        type: 'incident', // matches every live rule on this instance regardless of behavior (see file header)
+        // Checked every row of `em_alert_management_rule.type` on tacocorp+pdi
+        // (21 rows, live query): all 21 are 'incident', including the ones
+        // whose only child action is an em_launch_application with no
+        // incident-creation behavior at all (e.g. "SGO-Dynatrace",
+        // "Search Google for description", "Show Trigger in Honeycomb").
+        // sys_choice for this element/table combination returned no rows, so
+        // there's no OOB choice list to check the meaning against -- 'incident'
+        // is used here purely because it's the only value ever observed on
+        // this table, not because its label describes what this rule does.
+        type: 'incident',
         // "Alert matches filter" (2), not "Alert changes to filter" (1):
         // these are operator-invoked actions offered whenever a Dynatrace
         // alert is open in Service Operations Workspace, not one-time
@@ -76,6 +85,18 @@ Record({
         // description").
         automatic_execution_setting: 2,
         multiple_alert_rules: 1, // "Search for additional rules" -- does not block Task 11's rule from also evaluating the same alert
+        // Verified against sys_dictionary that `alert_filter` (internal_type
+        // "conditions") is the only filter-like column on this table -- there
+        // is no separate "advanced_filter". Encoding confirmed by querying
+        // every active em_alert_management_rule's alert_filter live: every
+        // rule that scopes by source uses the bare `source=<value>` form with
+        // no trailing `^EQ` -- e.g. "SGO-Dynatrace" -> `source=SGO-Dynatrace`,
+        // "Open sensor dashboard in PRTG" -> `source=PRTG`, and Task 11's own
+        // `dt-promote-primary-to-incident` -> `source=Dynatrace^correlation_
+        // rule_group=1^incidentISEMPTY`. `source=Dynatrace` here matches that
+        // convention exactly (same field, same literal value Task 11 already
+        // used, same no-^EQ encoding) -- copied from a live rule, not
+        // hand-composed.
         alert_filter: 'source=Dynatrace',
         description: 'Pull Dynatrace logs and metrics for the alert bound entity, and open the source problem in Dynatrace.',
     },

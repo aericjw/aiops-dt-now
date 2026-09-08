@@ -84,9 +84,21 @@ export const dtFetchMetricsSubflow = Subflow(
                 connectionalias: wfa.dataPill(fetchAliasLookup.Record, 'reference'),
                 timeframestart: '-15m',
                 timeframeend: '+15m',
+                // Query verified with `dtctl verify query '<dql>' --plain`
+                // against tacocorp (see task-13-report.md). The first draft
+                // (`dt.entity.*`, `to:+15m`) failed verification twice: (1)
+                // PARSE_ERROR on the wildcard entity field inside
+                // matchesValue() -- see the sibling comment in
+                // ../flows/dynatrace-fetch-logs-subflow.now.ts for why
+                // `dt.smartscape_source.id` (the same type-agnostic field the
+                // ingestion workflow derives dt_entity_id from) replaces it
+                // here too; (2) a CAN_BE_SIMPLIFIED warning on `to:+15m` --
+                // the leading `+` is redundant, corrected to `to:15m`. The
+                // hardcoded `dt.host.cpu.usage` metric itself is unchanged and
+                // still just a representative default (see note above).
                 query: wfa.inlineScript(`
                     var entityId = ${wfa.dataPill(params.flowVariables.entityId, 'string')} || '';
-                    return 'timeseries avg(dt.host.cpu.usage), filter: matchesValue(dt.entity.*, "' + entityId + '"), from:-15m, to:+15m';
+                    return 'timeseries avg(dt.host.cpu.usage), filter: matchesValue(dt.smartscape_source.id, "' + entityId + '"), from:-15m, to:15m';
                 `),
                 segmentid: '',
             }

@@ -112,9 +112,27 @@ export const dtFetchLogsSubflow = Subflow(
                 connectionalias: wfa.dataPill(fetchAliasLookup.Record, 'reference'),
                 timeframestart: '-30m',
                 timeframeend: 'now',
+                // Query verified with `dtctl verify query '<dql>' --plain`
+                // against tacocorp (see task-13-report.md). The brief's literal
+                // template used `dt.entity.*`, which fails verification --
+                // PARSE_ERROR, `,` isn't allowed here -- because a bare
+                // wildcard field is not valid inside `matchesValue()` (only
+                // valid in `by:` grouping contexts). `dt.entity.*` is also
+                // deprecated in favor of `dt.smartscape.*`, but neither
+                // resolves this specific problem: there is no single
+                // type-agnostic wildcard entity field usable as a filter
+                // argument, and the alert's bound entity can be any of the
+                // ~100+ classes in mapping/dt_to_snow_cmdb_mapping.csv (not
+                // just host/service/process). `dt.smartscape_source.id` is
+                // the type-agnostic identifier field this task already
+                // extracts dt_entity_id FROM in the ingestion workflow
+                // (dt-problems-to-snow-itom.yaml: `dt_entity_id =
+                // toString(dt.smartscape_source.id)`) -- using the same field
+                // name here keeps both sides of the comparison symmetric, and
+                // it verified successfully.
                 query: wfa.inlineScript(`
                     var entityId = ${wfa.dataPill(params.flowVariables.entityId, 'string')} || '';
-                    return 'fetch logs, from:-30m | filter matchesValue(dt.entity.*, "' + entityId + '") | limit 100';
+                    return 'fetch logs, from:-30m | filter matchesValue(dt.smartscape_source.id, "' + entityId + '") | limit 100';
                 `),
                 segmentid: '',
             }
