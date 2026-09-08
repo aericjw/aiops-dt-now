@@ -217,6 +217,14 @@ declare global {
                         table: 'em_alert_correlation_rule'
                         id: '0fe35d9505494e3c891966deaa7ae1ea'
                     }
+                    'dt-incident-template': {
+                        table: 'em_incident_template'
+                        id: '73f45376639c419c8d2503fa91d4f4f5'
+                    }
+                    'dt-promote-primary-to-incident': {
+                        table: 'em_alert_management_rule'
+                        id: '434ad54010874dc1b868e66325a6ac64'
+                    }
                     package_json: {
                         table: 'sys_module'
                         id: 'edbec6b922a64d8899c9c1f9b5a3a9f1'
