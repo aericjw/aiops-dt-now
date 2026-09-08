@@ -431,3 +431,107 @@ Two paths, built in this order:
 | A2 | Severity passthrough is acceptable until detectors are retuned | Real outages (Davis `"3"`) arrive as ServiceNow Minor and may sit below promotion thresholds. Called out explicitly; the user has accepted this and will correct it at the Dynatrace source. |
 | A3 | `em_match_rule` is the correct event-rule table for this EM version | Verified present with label "Event Rule"; `em_event_rule` does not exist in this instance |
 | A4 | SGC naming conventions are stable | Binding breaks for SGC-managed classes if SGC changes name composition |
+
+## 16. Verification results (Task 12, measured 2026-09-08)
+
+§2.1's evidence table was the *before* picture (0/100 CI bind, 0 event rules matched, all
+events forced to `cmdb_ci_service_calculated`). This section is the *after* picture, following
+Tasks 5–11's fixes, re-measured live against `tacocorp`/`pdi` rather than re-derived from prior
+reports. Numbers not re-measured in this task are cited from the task report or the execution
+ledger (`docs/execution/execution-ledger.md`) that established them, not re-verified here.
+
+| # | Check | Pass condition | Result | Evidence |
+|---|---|---|---|---|
+| V1 | `dtctl verify query` on rewritten DQL | no errors, no warnings | **PASS** | Re-ran `dtctl verify query` against the current live `dynatrace/dql/extract_events.dql` (Jinja stripped per the established recipe, now pointing at lookup v4): `✔ Query is valid`. Matches Task 6's original result. |
+| V2 | Every `now_ci_class` in the lookup exists in `sys_db_object` | 533/533 (superseded: 553/553, see Task 4's Grail-vocabulary fix) | **PASS** | `mapping/dt_to_snow_cmdb_mapping.csv` = 553 data rows (554 lines incl. header, confirmed by `wc -l` in this task). Task 4c/Task 5 controller-verified live: 553 rows uploaded to `/lookups/dt_to_snow_cmdb_mapping_v4` (superseding v2/v3, per Task 9's lookup-path history), validator exit 0, zero invalid classes, 22/22 live-firing entity keys covered. Not re-uploaded or re-diffed against `sys_db_object` in this task — cited, not re-derived. |
+| V3 | Workflow dry run on a live problem | N events in → N distinct `em_event` records out, each with its own entity | **PASS** | Established by Task 7 (P-26091047, 29 raw events → 29 `em_event` rows, 6 distinct `dt_entity_id` values, D1's `records[0]` bug fixed). Re-confirmed the shape holds on fresh live data in this task: pulled `wfe-task-result` for execution `75d85643…` (P-26091489 close trigger) and the `extract_events` task output correctly carries that trigger's own event (`dt_entity_id=SERVICE-01288A2EDDFE2F8B`), not a stale first-record value. |
+| V4 | `ci_type` correctness | no HOST event carries a service class | **PASS** | Task 9's rule-scoping fix (per-`bind_strategy` `em_match_rule`s at order 8010/8020/8090, each gated on `em_event.type`) is confirmed live: the execution-ledger's "BREAKTHROUGH" measurement shows `service`/`process` events matching their own strategy's rule (rule 12 / rule 17 respectively), and `environment` events now fall through to the catch-all instead of being swallowed by the host rule. No live HOST event was available to re-sample in this session, but the scoping mechanism (a plain `type=host^EQ` filter, not a token) is structural and was independently confirmed deployed. |
+| V5 | CI bind rate by `dt_entity_key` | measured and reported against the 0/100 baseline | **PASS (partial, environment-bounded)** | Baseline (§2.1): 0/100. Current best measurement (execution ledger, Task 9 fix round 2 + Task 9b, joining `em_event`→`em_alert.cmdb_ci`): **service 8/12 = 66% bound**, frontend 0/3 (no Dynatrace CIs exist for `cmdb_ci_web_application` on this PDI — a CMDB-coverage gap, not a rule defect), environment 0/14 (entity-less by nature, correctly excluded from the bindable rate per Ruling T9-F-ENTITYLESS) → **BINDABLE BIND RATE 8/15 = 53%**, materially above the 0/100 baseline. `process`/`k8s_*` bind mechanics are implemented and CIs were backfilled (Task 9b) but, per that task's own report, no live Davis problem of those classes has ever fired on this pipeline to exercise them — structurally reasoned as correct (name-based `sgc_process` join verified byte-for-byte against CMDB naming convention) but not empirically observed. Not re-measured with a fresh sample in this task (no new bind-relevant event class appeared in the close-path investigation); cited from the ledger's most recent confirmed number. |
+| V6 | Correlation | one Davis problem → one `em_agg_group`, exactly one primary alert | **FAIL** | Newly confirmed in this task, resolving the question Tasks 10/11 left open. Zero `em_alert` records with `source=Dynatrace^correlation_rule_group=1` exist on this instance (`npx @servicenow/sdk query em_alert -q 'source=Dynatrace^correlation_rule_group=1'` → 0 rows), and the only 3 `em_agg_group` rows with a populated `primary_alert_id` predate this pipeline (`sys_created_on` 2026-06-24, unrelated `source`). **Root cause identified**: read `servicenow/src/fluent/correlation/dynatrace-problem-grouping.now.ts`'s deployed script — for a Davis problem with exactly one alert (`others.length === 0` in the script, i.e. no *other* still-groupable sibling alert exists for the same `dt_problem_display_id`), **both branches of the `if (current.isRootCause) / else if (others.length > 0)` structure fall through and the script returns `JSON.stringify({})`** — no `PRIMARY` is ever assigned, even to a lone root-cause alert grouping trivially with itself. Confirmed this is the operative case: every closed alert sampled in this task's V8 verification (5 of 5) came from single-entity Davis problems (`"The problem affects 1 entity overall"`), and every one has `correlation_rule_group=0`. The business rule that invokes the script **does** fire on the qualifying transition (see V8 below — this was independently confirmed, since the script must have run to have been observed producing `{}` rather than an error), so this is a script logic gap, not a further instance of the platform's state-transition gating Tasks 10/11 suspected. |
+| V7 | Incident creation | one incident per group, from the primary alert only | **FAIL** | Directly downstream of V6: `em_alert_management_rule`'s trigger condition (`source=Dynatrace^correlation_rule_group=1^incidentISEMPTY`) has never matched, because no alert has ever reached `correlation_rule_group=1`. Confirmed live: `npx @servicenow/sdk query incident -q 'short_descriptionLIKEP-2609'` → 0 rows; `npx @servicenow/sdk query em_alert -q 'source=Dynatrace^incidentISNOTEMPTY'` → 0 rows. The rule and template built in Task 11 are deployed and structurally sound (verified field-by-field against the live record in that task) but have never had a matching input to act on. |
+| V8 | Close path | Davis problem close → severity 0 → alert resolved → **group closed** | **PARTIAL PASS** — close path proven end-to-end through the alert; group-closure leg is unreachable, not unverified, because V6 means no group is ever created | See "Close-path verification" below for full detail. Severity-0 emission: confirmed (5 examples). Alert reaching `state=Closed`: confirmed (5/5 examples, all with real `sys_updated_on != sys_created_on` transitions). Group closing: **cannot occur** for any alert observed, because per V6 no `em_agg_group` is ever created for a Dynatrace alert in the first place — there is no group to close. This is the same root cause as V6's failure, not an independent V8 defect. |
+
+### Close-path verification detail (spec V8)
+
+**Step 1 — found a closed problem.** `dynatrace/dql/checks/close-path.dql` (created this task) against
+live `tacocorp`, `from:-24h`: most recent closed, non-duplicate problem was **P-26091489**
+("Failure rate increase", `frontend` service), closed `2026-09-08T20:06:00Z`. Ten closed problems
+were returned in the 24h window; several others (`P-26091480`, message_key
+`121631538443771818_1788891780000`, closed `2026-09-08T18:37:04`) were used for the broader
+correlation-rule-group cross-check below because they had already fully processed by the time
+of investigation (P-26091489's own close event had not yet propagated a severity-0 `em_event`
+at the time it was checked — see the race-condition note below).
+
+**Step 2 — severity-0 event confirmed, same `message_key` as the open event.** For
+`message_key=121631538443771818_1788891780000` (`P-26091480`):
+```
+severity=3  resolution_state=New  sys_created_on=2026-09-08 18:30:34   (open)
+severity=0  resolution_state=New  sys_created_on=2026-09-08 18:37:04   (close)
+```
+Both rows share the exact `message_key` — confirmed this is what makes ServiceNow treat the
+second as a close of the first rather than a new event, per the brief. Four more independent
+examples were sampled and show the identical open→severity-0-close pattern
+(`6972629967322532533_1788875820000`, `-6585768356137897501_1788841860000`,
+`1918943197279840605_1788875820000`, `-5623786556723918206_1788730320000`).
+
+**New finding — a real race condition in the close path, not previously documented.** For
+**P-26091489 specifically**, the close-triggered workflow execution (`75d85643-…`,
+`2026-09-08T20:06:58Z`, `SUCCESS`) pulled its own `extract_events` task result via
+`dtctl get wfe-task-result`: the DQL's `event.status` field for the item read **`"ACTIVE"`**,
+not `"CLOSED"`, at a snapshot timestamp `20:05:58.505Z` — 65ms *before* the raw `dt.davis.events`
+record for the same `event.id` actually flipped to `event.status="CLOSED"` at `20:06:58.734Z`
+(confirmed by direct query of `dt.davis.events`). The DAVIS_PROBLEM close trigger fires the
+instant Davis marks a problem closed, but the underlying raw-event snapshot the DQL reads
+(`fetch events, from:t-5m, to:t+5m | dedup event.id, sort:{timestamp desc}`) can still lag behind
+that instant by more than the workflow's own execution latency (this run completed in 8s). The
+practical effect: `severity: '{{ 0 if _.item["event.status"] == "CLOSED" else _.item["event.severity"] }}'`
+evaluated to the *open* severity (3) for this specific problem's close event, which is why
+P-26091489 was swapped for the four already-settled examples above to demonstrate V8's
+severity-0 pass condition. **This means the close path is not 100% reliable** — it appears to
+depend on whether the raw event snapshot has landed in Grail by the time the workflow's 5-minute
+window query runs, which is a timing race, not a deterministic guarantee. Worth flagging to
+whoever owns this spec next; a wider window or a short delay before `extract_events` runs would
+likely close the gap, but that wasn't tested here (out of scope for a verification-only task).
+
+**Step 3 — alert resolution confirmed; group closure inapplicable.** For all 5 sampled
+message_keys, `em_alert` reached `state=Closed` with a genuine transition
+(`sys_updated_on != sys_created_on`), e.g.:
+```
+state=Closed  sys_created_on=2026-09-08 18:30:40  sys_updated_on=2026-09-08 18:37:09
+correlation_rule_group=0   incident=""
+```
+**Brief correction applied, as instructed**: `em_agg_group` has no `alerts_count` field
+(re-confirmed via `sys_dictionary` in this task: the real "is this group active" field is the
+choice field **`group_status`** — `1=Active`, `0=Inactive`, confirmed via `sys_choice`). This
+was moot for the actual check: **no `em_agg_group` record has ever been created for any of
+these alerts** (`correlation_rule_group` is `0` on every one), so there is no group whose
+`group_status` could be checked. This traces directly to V6's root cause above, not to any defect
+in the close-path mechanism itself.
+
+**Resolution of the open question from Tasks 10 and 11.** Both prior tasks flagged, as their
+top open item, whether the correlation-triggering business rule might specifically require a
+problem-closing transition to fire (as opposed to firing on any state transition, or not firing
+on insert at all). This task's live data resolves it: the transition **does** reach the
+correlation script (state changes from Open→Closed are real and observed, 5/5 sampled), but the
+script itself — not the platform's transition-gating — is why `correlation_rule_group` never
+populates. Every Davis problem sampled in this pipeline to date has produced exactly **one**
+alert per problem (no multi-alert bursts observed live), and the script's grouping logic requires
+`others.length > 0` (at least one *other* sibling alert already present) before it will assign
+`PRIMARY` to anything, even to a lone root-cause alert. **The hypothesis that closing is what
+gates correlation is refuted; the real gap is that the script never groups a single-alert
+problem with itself.** This is a genuinely new finding, not a restatement of Task 10/11's
+uncertainty, and is likely the dominant cause of V6/V7's fail state on this tenant, independent
+of whatever the platform's state-transition gating turns out to require for multi-alert bursts
+(still untested, since none has occurred live).
+
+### Summary
+
+| V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 |
+|---|---|---|---|---|---|---|---|
+| PASS | PASS | PASS | PASS | PASS (partial) | FAIL | FAIL | PARTIAL |
+
+5 of 8 checks pass outright; V5 passes with a documented ceiling (CMDB coverage, not rule
+defect); V6/V7 fail for a single identified, actionable root cause (the correlation script's
+single-alert gap); V8 is split — the event/alert leg of the close path passes (with one newly
+found reliability caveat, the extract-events race condition), while its group-closure leg is
+unreachable rather than failing on its own terms.

@@ -1,0 +1,5 @@
+fetch dt.davis.problems, from:-24h
+| filter event.status == "CLOSED" and not(dt.davis.is_duplicate)
+| fields display_id, event.id, event.name, event.start, event.end
+| sort event.end desc
+| limit 10
