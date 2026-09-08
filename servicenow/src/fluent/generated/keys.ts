@@ -289,6 +289,14 @@ declare global {
                         table: 'em_incident_template'
                         id: '73f45376639c419c8d2503fa91d4f4f5'
                     }
+                    'dt-now-assist-skill': {
+                        table: 'sn_aia_agent'
+                        id: '2cfa0bafda1d43c4b529e69bffd39742'
+                    }
+                    'dt-now-assist-skill-acl': {
+                        table: 'sys_security_acl'
+                        id: '3f8b3a68899d4890ba0a555d08ec8756'
+                    }
                     'dt-promote-primary-to-incident': {
                         table: 'em_alert_management_rule'
                         id: '434ad54010874dc1b868e66325a6ac64'
@@ -313,11 +321,37 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_agent_access_role_mapping'
+                        id: '0452a94e221d4f1ab943d8e5ae8d26db'
+                        key: {
+                            agent_access_config: {
+                                id: 'bc7e89f2764742d096a06a6f0d1c2898'
+                                key: {
+                                    agent: '2cfa0bafda1d43c4b529e69bffd39742'
+                                }
+                            }
+                            role: {
+                                id: '32786539d0694baa90508fd174bdd815'
+                                key: {
+                                    name: 'itil'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_hub_flow_input'
                         id: '049dede9d94740969c53455a29215c12'
                         key: {
                             model: '49f8f6ccfe534830a08672bce3b2b39d'
                             element: 'executionId'
+                        }
+                    },
+                    {
+                        table: 'sn_aia_version'
+                        id: '283d48c2fa3c49ce93fd2d75c3a85269'
+                        key: {
+                            target_id: '2cfa0bafda1d43c4b529e69bffd39742'
+                            version_name: 'V1'
                         }
                     },
                     {
@@ -338,6 +372,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sn_aia_tool'
+                        id: '416c38d30d6e40949f910e37a7a00d22'
+                        key: {
+                            name: 'Fetch Dynatrace Metrics'
+                        }
+                    },
+                    {
                         table: 'sys_hub_flow_variable'
                         id: '42cd5ac1525849149f8ee7225b8a9b16'
                         key: {
@@ -351,6 +392,22 @@ declare global {
                         key: {
                             model: '49f8f6ccfe534830a08672bce3b2b39d'
                             element: 'userDisplayName'
+                        }
+                    },
+                    {
+                        table: 'sn_aia_agent_tool_m2m'
+                        id: '4cd235d2d19e41ceb19baf2f3f04cfca'
+                        key: {
+                            agent: '2cfa0bafda1d43c4b529e69bffd39742'
+                            tool: '416c38d30d6e40949f910e37a7a00d22'
+                            name: 'Fetch Dynatrace Metrics'
+                        }
+                    },
+                    {
+                        table: 'sn_aia_tool'
+                        id: '50bb0146d1004aceb6cec5806d2b38b2'
+                        key: {
+                            name: 'Look Up Dynatrace Alert'
                         }
                     },
                     {
@@ -378,6 +435,15 @@ declare global {
                             name: 'var__m_sys_hub_flow_input_e641691909e240c180166a8b20f8bb4e'
                             element: 'alertRuleName'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sn_aia_agent_tool_m2m'
+                        id: '7438d8e2b3744f10ada1526057573eb8'
+                        key: {
+                            agent: '2cfa0bafda1d43c4b529e69bffd39742'
+                            tool: '50bb0146d1004aceb6cec5806d2b38b2'
+                            name: 'Look Up Dynatrace Alert'
                         }
                     },
                     {
@@ -432,6 +498,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sn_aia_agent_tool_m2m'
+                        id: 'a2537566b5b9462483bccf26fdae6a77'
+                        key: {
+                            agent: '2cfa0bafda1d43c4b529e69bffd39742'
+                            tool: 'cf141b32798649ac92e097e1cf1e7d59'
+                            name: 'Fetch Dynatrace Logs'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'ae36b9a5c6624282b5f3db842e01b374'
                         key: {
@@ -458,11 +533,33 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_agent_access_role_configuration'
+                        id: 'bc7e89f2764742d096a06a6f0d1c2898'
+                        key: {
+                            agent: '2cfa0bafda1d43c4b529e69bffd39742'
+                        }
+                    },
+                    {
                         table: 'sys_hub_flow_input'
                         id: 'be5926ebae8445d09ac0d084a887a541'
                         key: {
                             model: 'e641691909e240c180166a8b20f8bb4e'
                             element: 'alertGR'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'c3502230a5204ae38bd79bc7a315efaa'
+                        key: {
+                            sys_security_acl: '3f8b3a68899d4890ba0a555d08ec8756'
+                            sys_user_role: '282bf1fac6112285017366cb5f867469'
+                        }
+                    },
+                    {
+                        table: 'sn_aia_tool'
+                        id: 'cf141b32798649ac92e097e1cf1e7d59'
+                        key: {
+                            name: 'Fetch Dynatrace Logs'
                         }
                     },
                     {
@@ -479,6 +576,13 @@ declare global {
                         key: {
                             model: 'e641691909e240c180166a8b20f8bb4e'
                             element: 'alertRuleId'
+                        }
+                    },
+                    {
+                        table: 'sn_aia_agent_config'
+                        id: 'd895598026ba456ab8dab26c19a235b4'
+                        key: {
+                            agent: '2cfa0bafda1d43c4b529e69bffd39742'
                         }
                     },
                     {
