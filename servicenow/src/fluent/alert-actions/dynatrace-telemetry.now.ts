@@ -41,8 +41,13 @@ import '../flows/dynatrace-fetch-metrics-subflow.now'
 // existing, if cosmetically mislabeled, URL column that operators only ever
 // see via the named "Open problem in Dynatrace" button, never the raw field
 // label. Net effect: Outcome A applies. `em_launch_application` is used for
-// action 1, and it is the only one of the three actions verified end-to-end
-// this session (see task-13-report.md) -- it needs no Dynatrace credential.
+// action 1, and it is the only one of the three actions that needs no
+// Dynatrace credential. Deployed and confirmed via live query (rule, action
+// record, `${kb_url}` template, and the ingestion workflow's kb_url mapping
+// all present on the live instance) -- but the UI click-through itself
+// (opening a live alert in Service Operations Workspace and watching the
+// button navigate to the right Dynatrace problem) was not independently
+// observed this session (see task-13-report.md).
 //
 // Actions 2 and 3 (fetch logs / fetch metrics) both need the DQL execution
 // API, which needs the connection alias + read-only API token that
@@ -102,8 +107,9 @@ Record({
     },
 })
 
-// Action 1: open the Dynatrace problem. Credential-free -- verified
-// end-to-end this session (see task-13-report.md).
+// Action 1: open the Dynatrace problem. Credential-free -- deployed and
+// confirmed via live query this session; the UI click-through itself was
+// not independently observed (see task-13-report.md).
 Record({
     $id: Now.ID['dt-action-open-problem'],
     table: 'em_launch_application',
