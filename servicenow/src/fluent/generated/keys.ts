@@ -213,6 +213,10 @@ declare global {
                         table: 'em_match_rule'
                         id: 'c40c1fe9cbe5430682f3d90969cdb638'
                     }
+                    'dt-correlate-by-problem': {
+                        table: 'em_alert_correlation_rule'
+                        id: '0fe35d9505494e3c891966deaa7ae1ea'
+                    }
                     package_json: {
                         table: 'sys_module'
                         id: 'edbec6b922a64d8899c9c1f9b5a3a9f1'
