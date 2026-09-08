@@ -11,7 +11,7 @@ Record({
     $id: Now.ID['dt-backfill-browser-monitor-01'],
     table: 'cmdb_ci',
     data: {
-        name: 'ZZ-RETIRED-PLOOMES',
+        name: 'PLOOMES',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })

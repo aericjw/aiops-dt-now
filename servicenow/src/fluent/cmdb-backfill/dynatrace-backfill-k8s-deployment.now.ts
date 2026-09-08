@@ -11,7 +11,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-deployment-01'],
     table: 'cmdb_ci_kubernetes_deployment',
     data: {
-        name: 'ZZ-RETIRED-bindplane-gateway-agent',
+        name: 'bindplane-gateway-agent',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -20,7 +20,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-deployment-02'],
     table: 'cmdb_ci_kubernetes_deployment',
     data: {
-        name: 'ZZ-RETIRED-load-generator',
+        name: 'load-generator',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -29,7 +29,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-deployment-03'],
     table: 'cmdb_ci_kubernetes_deployment',
     data: {
-        name: 'ZZ-RETIRED-accounting',
+        name: 'accounting',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -38,7 +38,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-deployment-04'],
     table: 'cmdb_ci_kubernetes_deployment',
     data: {
-        name: 'ZZ-RETIRED-kafka',
+        name: 'kafka',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -47,7 +47,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-deployment-05'],
     table: 'cmdb_ci_kubernetes_deployment',
     data: {
-        name: 'ZZ-RETIRED-checkout',
+        name: 'checkout',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })

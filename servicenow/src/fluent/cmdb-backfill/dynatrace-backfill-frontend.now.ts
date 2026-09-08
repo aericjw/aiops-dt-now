@@ -11,7 +11,7 @@ Record({
     $id: Now.ID['dt-backfill-frontend-01'],
     table: 'cmdb_ci_web_application',
     data: {
-        name: 'ZZ-RETIRED-easytrade',
+        name: 'easytrade',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })

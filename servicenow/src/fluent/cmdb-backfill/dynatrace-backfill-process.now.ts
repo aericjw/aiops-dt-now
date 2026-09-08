@@ -11,7 +11,7 @@ Record({
     $id: Now.ID['dt-backfill-process-01'],
     table: 'cmdb_ci_appl',
     data: {
-        name: 'ZZ-RETIRED-Accounting.dll accounting-*@aks-agentpool-21707267-vmss00000l',
+        name: 'Accounting.dll accounting-*@aks-agentpool-21707267-vmss00000l',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -20,7 +20,7 @@ Record({
     $id: Now.ID['dt-backfill-process-02'],
     table: 'cmdb_ci_appl',
     data: {
-        name: 'ZZ-RETIRED-AccountingService.dll opentelemetry-demo-accountingservice-*@gke-salsa-cluster-basic-salsa-pool-092fc55d-j1ga',
+        name: 'AccountingService.dll opentelemetry-demo-accountingservice-*@gke-salsa-cluster-basic-salsa-pool-092fc55d-j1ga',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -29,7 +29,7 @@ Record({
     $id: Now.ID['dt-backfill-process-03'],
     table: 'cmdb_ci_appl',
     data: {
-        name: 'ZZ-RETIRED-bin/npm-cli.js (npm) opentelemetry-demo-flagd-*@gke-salsa-cluster-basic-salsa-pool-092fc55d-j1ga',
+        name: 'bin/npm-cli.js (npm) opentelemetry-demo-flagd-*@gke-salsa-cluster-basic-salsa-pool-092fc55d-j1ga',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -38,7 +38,7 @@ Record({
     $id: Now.ID['dt-backfill-process-04'],
     table: 'cmdb_ci_appl',
     data: {
-        name: 'ZZ-RETIRED-chrome@ace-box-hfvm',
+        name: 'chrome@ace-box-hfvm',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -47,7 +47,7 @@ Record({
     $id: Now.ID['dt-backfill-process-05'],
     table: 'cmdb_ci_appl',
     data: {
-        name: 'ZZ-RETIRED-chromium load-generator-5ff8dd49d7-776t6@aks-agentpool2-18907389-vmss000000',
+        name: 'chromium load-generator-5ff8dd49d7-776t6@aks-agentpool2-18907389-vmss000000',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -56,7 +56,7 @@ Record({
     $id: Now.ID['dt-backfill-process-06'],
     table: 'cmdb_ci_appl',
     data: {
-        name: 'ZZ-RETIRED-curl@aks-agentpool-21707267-vmss00000n',
+        name: 'curl@aks-agentpool-21707267-vmss00000n',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -65,7 +65,7 @@ Record({
     $id: Now.ID['dt-backfill-process-07'],
     table: 'cmdb_ci_appl',
     data: {
-        name: 'ZZ-RETIRED-edgedelta edgedelta@aks-agentpool-21707267-vmss00000k',
+        name: 'edgedelta edgedelta@aks-agentpool-21707267-vmss00000k',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -74,7 +74,7 @@ Record({
     $id: Now.ID['dt-backfill-process-08'],
     table: 'cmdb_ci_appl',
     data: {
-        name: 'ZZ-RETIRED-ig@aks-agentpool-21707267-vmss00000o',
+        name: 'ig@aks-agentpool-21707267-vmss00000o',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -83,7 +83,7 @@ Record({
     $id: Now.ID['dt-backfill-process-09'],
     table: 'cmdb_ci_appl',
     data: {
-        name: 'ZZ-RETIRED-npd-log-counter@aks-agentpool-21707267-vmss00000o',
+        name: 'npd-log-counter@aks-agentpool-21707267-vmss00000o',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -92,7 +92,7 @@ Record({
     $id: Now.ID['dt-backfill-process-10'],
     table: 'cmdb_ci_appl',
     data: {
-        name: 'ZZ-RETIRED-prometheus opentelemetry-demo-prometheus-server-*@gke-salsa-cluster-basic-salsa-pool-86abe6ed-eva7',
+        name: 'prometheus opentelemetry-demo-prometheus-server-*@gke-salsa-cluster-basic-salsa-pool-86abe6ed-eva7',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -101,7 +101,7 @@ Record({
     $id: Now.ID['dt-backfill-process-11'],
     table: 'cmdb_ci_appl',
     data: {
-        name: 'ZZ-RETIRED-prometheus prometheus-*@aks-agentpool-21707267-vmss00000o',
+        name: 'prometheus prometheus-*@aks-agentpool-21707267-vmss00000o',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -110,7 +110,7 @@ Record({
     $id: Now.ID['dt-backfill-process-12'],
     table: 'cmdb_ci_appl',
     data: {
-        name: 'ZZ-RETIRED-rails-dependencies gitlab-sidekiq-all-in-*-v*-*@ace-box-hfvm',
+        name: 'rails-dependencies gitlab-sidekiq-all-in-*-v*-*@ace-box-hfvm',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })

@@ -11,7 +11,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-namespace-01'],
     table: 'cmdb_ci_kubernetes_namespace',
     data: {
-        name: 'ZZ-RETIRED-bindplane-agent',
+        name: 'bindplane-agent',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -20,7 +20,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-namespace-02'],
     table: 'cmdb_ci_kubernetes_namespace',
     data: {
-        name: 'ZZ-RETIRED-dynatrace',
+        name: 'dynatrace',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -29,7 +29,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-namespace-03'],
     table: 'cmdb_ci_kubernetes_namespace',
     data: {
-        name: 'ZZ-RETIRED-easytrade',
+        name: 'easytrade',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -38,7 +38,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-namespace-04'],
     table: 'cmdb_ci_kubernetes_namespace',
     data: {
-        name: 'ZZ-RETIRED-astroshop',
+        name: 'astroshop',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -47,7 +47,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-namespace-05'],
     table: 'cmdb_ci_kubernetes_namespace',
     data: {
-        name: 'ZZ-RETIRED-kube-system',
+        name: 'kube-system',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })

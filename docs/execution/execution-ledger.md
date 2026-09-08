@@ -539,6 +539,22 @@ redeploy) and self-verifies via query; it reported the honest result (0/96 renam
 than a false success. CMDB CI records on this PDI are effectively create-only through every
 write path available to this pipeline.
 
+POST-REVIEW CORRECTION: the full-set test run of `neutralize_cmdb_backfill.py` above (the
+one that produced the "0/96 renamed" result) rewrote the `name` field in place across all 8
+committed `servicenow/src/fluent/cmdb-backfill/*.now.ts` files to the `ZZ-RETIRED-` form as
+a side effect of testing it, and that post-rewrite state is what got committed in 1eef2c1 -
+not the original Step-3 composed names. Since the rename never actually applied on the live
+instance (per the finding above), this meant the committed *source* had silently diverged
+from live *reality*: redeploying from that source to a fresh instance (or after the
+create-only protection is ever lifted) would have created these CIs with the neutralized
+names, quietly defeating the whole backfill's byte-for-byte name-matching purpose. Caught in
+review; fixed by regenerating all 8 files from the original Step-1 name list (not by
+hand-stripping the prefix, to avoid transcription slips) and re-verifying both that no
+`ZZ-RETIRED-` string remains in the committed source and that the live ServiceNow records
+still hold the original names (confirmed via `now-sdk query` spot-checks across k8s_cluster,
+frontend, browser_monitor, and process - all matched the original Step-1 names, unchanged,
+as expected since updates don't take effect on this PDI). Committed as a follow-up fix.
+
 Step 5 measurement: `dtctl exec workflow 7c35a230-... --plain` errored on manual trigger
 ("Undefined variables: timestamp") - the workflow's trigger is Event-type and reads
 `event()["timestamp"]` from a real Davis-problem trigger payload, which `--input` (used

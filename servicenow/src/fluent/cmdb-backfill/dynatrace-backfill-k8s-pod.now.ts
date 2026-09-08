@@ -11,7 +11,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-01'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-opentelemetry-demo-prometheus-server-c69db89d4-fw5qk',
+        name: 'opentelemetry-demo-prometheus-server-c69db89d4-fw5qk',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -20,7 +20,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-02'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-opentelemetry-demo-flagd-5d67ccf97-49dpz',
+        name: 'opentelemetry-demo-flagd-5d67ccf97-49dpz',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -29,7 +29,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-03'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-opentelemetry-demo-cartservice-84b6999749-j5sdc',
+        name: 'opentelemetry-demo-cartservice-84b6999749-j5sdc',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -38,7 +38,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-04'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-opentelemetry-demo-adservice-796f594686-297qc',
+        name: 'opentelemetry-demo-adservice-796f594686-297qc',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -47,7 +47,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-05'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-opentelemetry-demo-frauddetectionservice-768b65b4cf-z6cbb',
+        name: 'opentelemetry-demo-frauddetectionservice-768b65b4cf-z6cbb',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -56,7 +56,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-06'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-opentelemetry-demo-kafka-6f766f584b-5tgg5',
+        name: 'opentelemetry-demo-kafka-6f766f584b-5tgg5',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -65,7 +65,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-07'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-opentelemetry-demo-accountingservice-6c7bc84587-h887l',
+        name: 'opentelemetry-demo-accountingservice-6c7bc84587-h887l',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -74,7 +74,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-08'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-load-generator-5ff8dd49d7-776t6',
+        name: 'load-generator-5ff8dd49d7-776t6',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -83,7 +83,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-09'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-bindplane-gateway-agent-7f8cfb858b-7fnfm',
+        name: 'bindplane-gateway-agent-7f8cfb858b-7fnfm',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -92,7 +92,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-10'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-bindplane-gateway-agent-7f8cfb858b-8zjvn',
+        name: 'bindplane-gateway-agent-7f8cfb858b-8zjvn',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -101,7 +101,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-11'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-bindplane-gateway-agent-7f8cfb858b-bf27z',
+        name: 'bindplane-gateway-agent-7f8cfb858b-bf27z',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -110,7 +110,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-12'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-bindplane-gateway-agent-7f8cfb858b-wxpqq',
+        name: 'bindplane-gateway-agent-7f8cfb858b-wxpqq',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -119,7 +119,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-13'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-bindplane-gateway-agent-7f8cfb858b-b5z6q',
+        name: 'bindplane-gateway-agent-7f8cfb858b-b5z6q',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -128,7 +128,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-14'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-accounting-8555fc45dc-qzwvm',
+        name: 'accounting-8555fc45dc-qzwvm',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -137,7 +137,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-15'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-bindplane-gateway-agent-7f8cfb858b-vtw6q',
+        name: 'bindplane-gateway-agent-7f8cfb858b-vtw6q',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -146,7 +146,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-16'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-bindplane-gateway-agent-7f8cfb858b-6b7gj',
+        name: 'bindplane-gateway-agent-7f8cfb858b-6b7gj',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -155,7 +155,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-17'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-astroshop-emailservice-84b7b8ccfb-vtw8w',
+        name: 'astroshop-emailservice-84b7b8ccfb-vtw8w',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -164,7 +164,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-18'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-bindplane-gateway-agent-7f8cfb858b-wgn8f',
+        name: 'bindplane-gateway-agent-7f8cfb858b-wgn8f',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -173,7 +173,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-19'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-opentelemetry-demo-frontend-586f54d966-jmlvk',
+        name: 'opentelemetry-demo-frontend-586f54d966-jmlvk',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -182,7 +182,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-pod-20'],
     table: 'cmdb_ci_kubernetes_pod',
     data: {
-        name: 'ZZ-RETIRED-metrics-server-v1.35.1-5bcff44f45-22tr4',
+        name: 'metrics-server-v1.35.1-5bcff44f45-22tr4',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })

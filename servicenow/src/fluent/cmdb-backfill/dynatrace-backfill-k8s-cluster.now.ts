@@ -11,7 +11,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-cluster-01'],
     table: 'cmdb_ci_kubernetes_cluster',
     data: {
-        name: 'ZZ-RETIRED-salsa-cluster',
+        name: 'salsa-cluster',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })

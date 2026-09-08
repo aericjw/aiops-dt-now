@@ -11,7 +11,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-node-01'],
     table: 'cmdb_ci_kubernetes_node',
     data: {
-        name: 'ZZ-RETIRED-aks-agentpool2-18907389-vmss000000',
+        name: 'aks-agentpool2-18907389-vmss000000',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
@@ -20,7 +20,7 @@ Record({
     $id: Now.ID['dt-backfill-k8s-node-02'],
     table: 'cmdb_ci_kubernetes_node',
     data: {
-        name: 'ZZ-RETIRED-aks-agentpool2-18907389-vmss000001',
+        name: 'aks-agentpool2-18907389-vmss000001',
         discovery_source: 'SIM-Dynatrace-Test',
     },
 })
