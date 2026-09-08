@@ -4,11 +4,14 @@
 # Isolates OUR events (from the new pipeline) from the disabled v1 workflow's
 # leftover em_event records, which lack dt_entity_key in additional_info.
 #
-# Bound is measured directly off the real em_event.cmdb_ci reference column
-# (non-empty == bound), not inferred from processing_notes text - that text can be
-# truncated or otherwise misleading (observed: a record with only "Event rule
-# applied: ..." in processing_notes and an empty cmdb_ci, which text-matching alone
-# would have miscounted as bound).
+# Bound is measured off em_alert.cmdb_ci (dot-walked as alert.cmdb_ci), not
+# em_event.cmdb_ci - binding lands on the alert record ("Binding alert CI process
+# flow" in processing_notes), never on the event, so measuring em_event.cmdb_ci
+# always reads 0% regardless of actual bind success. Not inferred from
+# processing_notes text either - that text can be truncated or otherwise
+# misleading (observed: a record with only "Event rule applied: ..." in
+# processing_notes and an empty cmdb_ci, which text-matching alone would have
+# miscounted as bound).
 #
 # `environment` and `__unknown__` dt_entity_keys are entity-less: Dynatrace's
 # tenant-level pseudo-entity and events with no resolvable entity at all. Neither
@@ -20,7 +23,7 @@ ENTITY_LESS_KEYS="environment __unknown__"
 
 npx --yes @servicenow/sdk@4.11.2 query em_event \
   -q 'sourceLIKEDynatrace^additional_infoLIKEdt_entity_key^ORDERBYDESCsys_created_on' \
-  --limit "$LIMIT" -f type,ci_type,cmdb_ci,additional_info,processing_notes,alert \
+  --limit "$LIMIT" -f type,ci_type,alert.cmdb_ci,additional_info,processing_notes,alert \
   -o json -a pdi \
 | ENTITY_LESS_KEYS="$ENTITY_LESS_KEYS" python3 -c '
 import json, os, sys, collections
@@ -29,7 +32,7 @@ entity_less_keys = set(os.environ["ENTITY_LESS_KEYS"].split())
 by_key = collections.defaultdict(lambda: {"total": 0, "bound": 0})
 for r in rows:
     key = r.get("type") or "__none__"
-    bound = bool((r.get("cmdb_ci") or "").strip())
+    bound = bool((r.get("alert.cmdb_ci") or "").strip())
     by_key[key]["total"] += 1
     if bound:
         by_key[key]["bound"] += 1
