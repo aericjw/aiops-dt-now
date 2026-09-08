@@ -1619,6 +1619,182 @@ git commit -m "feat: bind Dynatrace events to CIs with per-class identifier stra
 
 ---
 
+### Task 9b: Backfill simulated CMDB CIs to test binding coverage
+
+Added mid-run (not part of the original plan). Task 9 confirmed the binding mechanism
+works, but on this PDI most non-`host`/`service`/`process` classes have zero matching
+CMDB CIs to bind to at all — that is a gap in this test instance's CMDB population, not
+in the mapping (in a real customer environment the CMDB is populated from many
+discovery sources). User directed: backfill simulated CMDB data, generated from live
+Dynatrace topology so names match byte-for-byte, to test whether binding actually
+works when a matching CI exists. Mark every backfilled record with
+`discovery_source = SIM-Dynatrace-Test` and ship a teardown script.
+
+**Known going in (do not re-derive):**
+- `host` and `service` CMDB CIs already exist with exact-match names for every entity
+  currently producing events — no backfill needed for these two classes.
+- Per `mapping/dt_to_snow_cmdb_mapping.csv`, only `host`, `service`, and `process` use
+  `bind_strategy` `sgc_host`/`sgc_service`/`sgc_process` with name-based
+  `em_match_rule` identification (Task 9). Every other class — including all `k8s_*`
+  and `frontend` — is `ire_correlated`, matching on `correlation_id`, which is
+  confirmed always empty on SGC-created CIs (defect D3). **Backfilling CMDB names for
+  those classes is not expected to make them bind** — that is the open question this
+  task exists to answer empirically, not a defect to fix here. Record the actual
+  result either way.
+- The exact figures cited in earlier session notes for "how many entities need
+  backfill" are stale (tenant traffic and workflow cadence have moved on). Re-derive
+  the current scope live in Step 1 rather than trusting a hardcoded count.
+
+**Files:**
+- Create: `servicenow/src/fluent/cmdb-backfill/*.now.ts` (write mechanism confirmed;
+  must live under `src/fluent/`, not a sibling directory — see Step 2)
+- Create: `scripts/neutralize-cmdb-backfill.sh` (renamed from `teardown-...` — see
+  Step 2's ruling: CMDB CI records cannot be physically deleted on this PDI, so
+  cleanup means renaming them inert, not removing the rows)
+- Modify: `docs/execution/execution-ledger.md` or equivalent — record the per-class
+  bind-rate table from Step 5
+
+**Interfaces:**
+- Consumes: `scripts/bind-rate-report.sh` (Task 9) as both the before/after
+  measurement and the source of which `dt_entity_key` values currently have
+  unbound events.
+- Produces: CMDB CI records tagged `discovery_source = SIM-Dynatrace-Test`, and a
+  neutralize script that renames exactly those records to an inert form.
+
+- [ ] **Step 1: Determine current scope from live data, not from old notes**
+
+Run `scripts/bind-rate-report.sh 500` first to see which `dt_entity_key` values
+currently have unbound events. Then, for `process`, `k8s_pod`, `k8s_deployment`,
+`k8s_namespace`, `k8s_node`, `k8s_cluster`, `frontend`, and `browser_monitor`, pull
+the distinct entity names actually needed via DQL against `dt.davis.events` (same
+`dt_entity_key` derivation as `dynatrace/dql/extract_events.dql`), for example:
+
+```
+fetch dt.davis.events, from:-24h
+| fieldsAdd dt_raw_type = arrayFirst(coalesce(smartscape.affected_entity.types, affected_entity_types))
+| fieldsAdd dt_entity_key = if(isNull(dt_raw_type), "__unknown__",
+    else: lower(if(startsWith(dt_raw_type, "dt.entity."), substring(dt_raw_type, from: 10), else: dt_raw_type)))
+| filter dt_entity_key == "<class>"
+| fieldsAdd dt_entity_id = toString(dt.smartscape_source.id)
+| fieldsAdd dt_entity_name = coalesce(getNodeName(dt.smartscape_source.id), arrayFirst(affected_entity_names))
+| summarize count(), by:{dt_entity_id, dt_entity_name}
+| sort `count()` desc
+| limit 20
+```
+
+Run via `dtctl query '<dql>' --plain` (not `dtctl verify query`, which only
+validates). **Cap each class at the 20 most-frequent entities in the last 24h** —
+Ruling: full tenant Smartscape topology for `process` and `k8s_pod` alone is in the
+tens of thousands of entities system-wide, three to four orders of magnitude more
+than needed to prove or disprove the binding mechanism; a bounded, most-active sample
+is sufficient and keeps the write volume to the live PDI sane. If wrong, re-run with a
+different limit — cheap to redo.
+
+For `process`, additionally join the `runs_on` edge to the parent host (same pattern
+as Task 9 Step 3 / `dynatrace/dql/extract_events.dql`) so you can compose the exact
+`<proc>@<host>` name the `sgc_process` identification rule searches for.
+
+For each class, query the corresponding CMDB table (mapping in
+`mapping/dt_to_snow_cmdb_mapping.csv`: `process`→`cmdb_ci_appl`,
+`k8s_pod`→`cmdb_ci_kubernetes_pod`, `k8s_deployment`→`cmdb_ci_kubernetes_deployment`,
+`k8s_namespace`→`cmdb_ci_kubernetes_namespace`, `k8s_node`→`cmdb_ci_kubernetes_node`,
+`k8s_cluster`→`cmdb_ci_kubernetes_cluster`, `frontend`→`cmdb_ci_web_application`,
+`browser_monitor`→`cmdb_ci`) via `now-sdk query <table> -q 'nameIN<comma-list>'
+-f name -o json -a pdi` to find which of the 20 already exist. Backfill only the
+missing ones.
+
+- [ ] **Step 2: Write mechanism and teardown contract (already investigated — read before doing anything)**
+
+A prior implementer already investigated this step and reported BLOCKED; you are
+resuming with that investigation done and a ruling from the user. Do not repeat the
+investigation — read `.superpowers/sdd/2026-09-05-dynatrace-servicenow-aiops/task-9b-report.md`
+in full first, then proceed from these established facts:
+
+- **Write path confirmed working**: a `Record()` block in a `.now.ts` file, built and
+  installed via `npx @servicenow/sdk build && npx @servicenow/sdk install --auth pdi`.
+  **Layout constraint confirmed the hard way**: the build only picks up `.now.ts`
+  files under `servicenow/src/fluent/` (or a subdirectory of it) — a sibling
+  directory like `servicenow/src/cmdb-backfill/` is silently ignored (no error, no
+  entry in the generated `src/fluent/generated/keys.ts` manifest). Put backfill
+  source under `servicenow/src/fluent/cmdb-backfill/`.
+- **Physical deletion of CMDB CI records is confirmed NOT possible** via any
+  mechanism available in this environment: code-removal + rebuild + redeploy,
+  explicit `Now.del()`, and full `install --reinstall` were all tried against a live
+  throwaway `cmdb_ci_appl` test record and none removed it (a control test against a
+  non-CMDB table worked, isolating this to CMDB CI tables specifically — almost
+  certainly ServiceNow's standard CMDB delete-protection). **Do not re-attempt these
+  or invent a new deletion mechanism** — this is settled, not open.
+- One orphaned test CI is already live on the PDI from that investigation
+  (`cmdb_ci_appl` sys_id `d235f3db8c3a470b8987048a07d7ad58`, name
+  `TEARDOWN-VERIFY-TEST-SIM-Dynatrace`, `discovery_source=SIM-Dynatrace-Test`). User
+  decision: **leave it in place** — it is correctly tagged and harmless. Do not spend
+  further effort trying to remove it.
+
+**Ruling (user decision, carried into this brief): redefine "teardown" as
+neutralize, not delete.** Since these CMDB CI records cannot be physically removed
+on this PDI, "teardown" for this task means: rename every backfilled record (matched
+by `discovery_source = "SIM-Dynatrace-Test"`) to a name that cannot byte-for-byte
+match any real Dynatrace-composed `dt_ci_name`/`dt_entity_name` — e.g. prefix with
+`ZZ-RETIRED-` — so it stops being a live binding target, without deleting the row.
+This changes the task's deliverable from a delete script to a neutralize (rename)
+script; update every reference to "teardown" below accordingly.
+
+- [ ] **Step 3: Create the backfill records**
+
+One Fluent source file per class under `servicenow/src/fluent/cmdb-backfill/` (e.g.
+`servicenow/src/fluent/cmdb-backfill/dynatrace-backfill-process.now.ts`), each
+`Record()` setting at minimum `name` (the exact composed name from Step 1) and
+`discovery_source: "SIM-Dynatrace-Test"`. Use `now-sdk transform` against an existing
+record of the same class first (same pattern as Task 9 Step 4) to learn which other
+fields are required for a valid insert on this instance — do not guess required
+fields.
+
+Build and deploy:
+
+```bash
+cd servicenow && npx @servicenow/sdk build && npx @servicenow/sdk deploy --auth pdi && cd ..
+```
+
+- [ ] **Step 4: Write and test the neutralize (formerly "teardown") script**
+
+`scripts/neutralize-cmdb-backfill.sh` (rename from `teardown-cmdb-backfill.sh` per
+the Step 2 ruling) — queries every record with `discovery_source =
+"SIM-Dynatrace-Test"` across the 8 backfill target tables (plus the pre-existing
+orphan in `cmdb_ci_appl`, for completeness, though it's already inert enough to
+leave alone per the user's decision) and renames each to a `ZZ-RETIRED-<original
+name>` form. Since `now-sdk query` is read-only, use the same Fluent
+build/install write path as Step 3 to apply the rename (an `Update()`-style
+`Record()` targeting the same sys_ids, or equivalent — follow whatever update
+pattern `now-sdk explain` or the Fluent docs show for modifying existing records by
+sys_id). Test it against one of the Step 3 records first and confirm via
+`now-sdk query` that the name changed before treating it as done.
+
+- [ ] **Step 5: Re-run the workflow and measure**
+
+```bash
+dtctl exec workflow 7c35a230-d8bf-4379-8137-43b8ad000f3d --plain
+sleep 90
+./scripts/bind-rate-report.sh 500
+```
+
+Record the per-class table. Expected and acceptable: `process` improves materially
+(it has a working name-based identification rule); `k8s_*`, `frontend`, and
+`browser_monitor` most likely stay at 0% bound despite the CI now existing, because
+`ire_correlated` needs `correlation_id`, which the backfilled CIs don't have — **this
+outcome, if observed, answers Task 9's open question and is not a task failure.** If
+any of them instead do bind, that's an important, unexpected finding — capture what
+made it bind (e.g. IRE falling through to a secondary name-only match) since it
+changes the answer to Task 9's open question.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add servicenow/src/fluent/cmdb-backfill/ scripts/neutralize-cmdb-backfill.sh
+git commit -m "feat: backfill simulated CMDB CIs to test binding coverage for non-SGC classes"
+```
+
+---
+
 ### Task 10: Alert correlation and primary alert
 
 **Files:**
