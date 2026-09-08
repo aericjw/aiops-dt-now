@@ -499,3 +499,61 @@ CONTROLLER PRE-CHECK FOR TASK 9B - backfill is smaller than planned:
   frontend 0    none exist
 So backfill scope drops to process (partial), k8s (all), frontend. host and service need
 nothing and already prove the mechanism.
+
+=== TASK 9B EXECUTION: 47 backfill CIs created, teardown redefined to neutralize (rename),
+CMDB writes confirmed create-only on this PDI ===
+
+Live re-derivation (Step 1, dt.davis.events from:-24h, top 20/class, tacocorp context):
+missing CIs were process 12 (of 19 distinct names in the top-20 sample; 7 already existed),
+k8s_pod 20, k8s_deployment 5, k8s_namespace 5, k8s_node 2, k8s_cluster 1, frontend 1,
+browser_monitor 1 = 47 total (not the ~90 or 102 cited in earlier session notes - both are
+now stale; re-derive live each time, per the brief's own caution).
+
+TEARDOWN INVESTIGATION (Step 2, prior round, reported BLOCKED): physical deletion of a
+cmdb_ci_appl test record was tried three ways - code-removal+rebuild+redeploy, explicit
+Now.del(), and full `install --reinstall` - and none removed it. A control test against a
+non-CMDB table (sys_properties) worked, isolating the failure to CMDB CI tables. User
+ruling: teardown is redefined as NEUTRALIZE (rename to `ZZ-RETIRED-<name>`), not delete;
+the one orphaned test CI stays in place, tagged and harmless.
+
+Layout gotcha confirmed the hard way: `now-sdk build` only picks up `.now.ts` files under
+`servicenow/src/fluent/` (or a subdirectory of it) - a sibling directory like
+`servicenow/src/cmdb-backfill/` is silently ignored, no error, no manifest entry. Backfill
+source lives at `servicenow/src/fluent/cmdb-backfill/*.now.ts`.
+
+Step 3: created all 47 records (one Record() per entity, `name` + `discovery_source:
+"SIM-Dynatrace-Test"`), built and installed. Verified present via `now-sdk query` against
+each of the 8 target tables (cmdb_ci_appl, cmdb_ci_kubernetes_pod/deployment/namespace/
+node/cluster, cmdb_ci_web_application, cmdb_ci) - all 47 landed with the exact composed
+names from Step 1 and the correct discovery_source tag.
+
+Step 4 NEW FINDING (broader than the Step 2 delete finding): field UPDATES to already-
+created CMDB CI records are ALSO silently dropped by this PDI's Fluent/now-sdk write path -
+not just deletes. Tested rewriting `name` (rename to ZZ-RETIRED-) and, as a control,
+changing a wholly unrelated field (`operational_status`) on two different backfilled
+records across two different tables; rebuilt and reinstalled (including a `--reinstall`
+full wipe+recreate); `sys_mod_count` stayed at `0` in every case - the instance registered
+zero write operations against these rows after their initial creation. `scripts/
+neutralize-cmdb-backfill.sh` performs the correct mechanism (rewrite source -> rebuild ->
+redeploy) and self-verifies via query; it reported the honest result (0/96 renamed) rather
+than a false success. CMDB CI records on this PDI are effectively create-only through every
+write path available to this pipeline.
+
+Step 5 measurement: `dtctl exec workflow 7c35a230-... --plain` errored on manual trigger
+("Undefined variables: timestamp") - the workflow's trigger is Event-type and reads
+`event()["timestamp"]` from a real Davis-problem trigger payload, which `--input` (used
+for workflow-level inputs like snow_source/snow_table) does not supply. This is the same
+limitation Task 9 already hit and documented (their round-2 report: "I did not wait on
+live em_event records... no fresh Davis-problem burst had landed"). `bind-rate-report.sh`
+(both 500 and 3000-row limits; only 392 em_event rows exist total) shows the same shape as
+every prior measurement in this ledger: only `service`/`frontend`/`host`/`browser_monitor`
+have ever produced a live em_event row on this pipeline; process/k8s_* have never once
+fired a live Davis PROBLEM (as opposed to raw dt.davis.events noise) since this pipeline
+existed. So Task 9b's core empirical question - does binding actually work once a matching
+CI exists for these classes - cannot be answered by live measurement in this environment;
+it can only be reasoned about structurally from the confirmed rule mechanics (Task 9) plus
+the confirmed CI existence (Task 9b Step 3): process (sgc_process, name-based) should bind
+the next time a process-class problem fires; k8s_*/frontend/browser_monitor (ire_correlated,
+correlation_id-based) are expected to keep failing to bind even then, since the backfilled
+CIs' correlation_id is empty (defect D3, unchanged) - this remains the answer to Task 9's
+open question, just still unconfirmed live for lack of a trigger-able test event.
