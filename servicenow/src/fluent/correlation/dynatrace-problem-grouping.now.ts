@@ -49,6 +49,31 @@ import { Record } from '@servicenow/sdk/core'
 // alert, so the legacy rule's latent bug never gets a chance to fire against
 // our events. The legacy rule itself was left untouched (out of scope for
 // this task, and not risk-free to alter blind).
+//
+// --- Single-alert gap (fixed 2026-09-08, see task-10-fix-single-alert-report.md) --
+// Task 12's verification found V6/V7 both FAIL on live traffic and root-caused it
+// here: both branches below were originally gated on `others.length > 0` (others =
+// other still-groupable alerts already seen for the same Davis problem). Every
+// Davis problem sampled on this tenant to date has produced exactly one alert, so
+// `others.length` was always 0, neither branch's inner condition was ever true, and
+// the script fell through to `return JSON.stringify({})` -- no alert was EVER
+// assigned PRIMARY, not even a lone root-cause alert trivially grouping with
+// itself. This is why correlation_rule_group never populated in practice despite
+// the rule being deployed, active, and correctly ordered.
+// Fix: an `others.length === 0` case now runs first and makes currentAlert PRIMARY
+// of a group containing only itself (SECONDARY: [] -- empty array, not omitted;
+// ServiceNow's own OOB "Alert correlation rule SAMPLE" script's header documents
+// the result shape as PRIMARY (exactly 1 sys_id) + SECONDARY (an array, 1..n in
+// its own worked example, but the field itself is never optional in any sample
+// seen), so SECONDARY is kept present and typed as an array even when empty rather
+// than omitted, to match that shape rather than guess at an undocumented
+// omitted-key behavior). This applies regardless of current.isRootCause: a
+// genuinely solo alert has no better primary candidate than itself either way. The
+// pre-existing "demote to the real root-cause alert when it later arrives" logic
+// (the `current.isRootCause` branch, which re-parents ALL of `others`) already
+// covers the case where a second, root-cause alert for the same problem arrives
+// after this one: by then `others.length` is 1 (this alert), so that branch fires
+// as before -- no change was needed there.
 Record({
     $id: Now.ID['dt-correlate-by-problem'],
     table: 'em_alert_correlation_rule',
@@ -130,17 +155,28 @@ Record({
     }
 
     var result = {};
-    if (current.isRootCause) {
+    if (others.length === 0) {
+        // No other still-groupable alert has been seen yet for this Davis
+        // problem: currentAlert is primary of a group containing only
+        // itself -- root-cause or not, there is no better candidate than
+        // itself when it's the only alert. If a genuine root-cause alert
+        // for this problem arrives later (while this one is still
+        // "current"), the isRootCause branch below re-parents everything in
+        // others -- which will by then include this alert -- so this
+        // provisional self-primary gets correctly demoted at that point.
+        result = {
+            'PRIMARY': [currentAlert.getValue('sys_id')],
+            'SECONDARY': [],
+        };
+    } else if (current.isRootCause) {
         // currentAlert is the Davis root-cause event: it is primary over
         // every other alert already seen for this problem, even ones
         // provisionally (mis)assigned primary before this one arrived.
-        if (others.length > 0) {
-            result = {
-                'PRIMARY': [currentAlert.getValue('sys_id')],
-                'SECONDARY': others,
-            };
-        }
-    } else if (others.length > 0) {
+        result = {
+            'PRIMARY': [currentAlert.getValue('sys_id')],
+            'SECONDARY': others,
+        };
+    } else {
         // Prefer an already-seen root-cause alert as primary; fall back to
         // the earliest-arrived alert for this problem if the root-cause
         // event hasn't shown up yet (it will re-parent everything above
