@@ -131,6 +131,9 @@ tasks:
         - id: f-additional-info
           key: additional_info
           value: '{{ _.item }}'
+        - id: f-dt-problem-url
+          key: kb_url
+          value: '{{ _.item["dt_problem_url"] }}'
       tableName: "{{ input('snow_table') }}"
     name: send_event_to_servicenow
     position:

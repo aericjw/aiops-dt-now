@@ -9,6 +9,18 @@ declare global {
                         table: 'sys_module'
                         id: 'ff20189aca094a2bb7f4063e81de638c'
                     }
+                    'dt-action-fetch-logs': {
+                        table: 'em_alert_man_m2m_rule_flow'
+                        id: 'd3d916abb0e044598901fcf7881cd14c'
+                    }
+                    'dt-action-fetch-metrics': {
+                        table: 'em_alert_man_m2m_rule_flow'
+                        id: '7cf9b7245f8d41288059ba514a35a905'
+                    }
+                    'dt-action-open-problem': {
+                        table: 'em_launch_application'
+                        id: 'e337198f680147348e563f31f28c0031'
+                    }
                     'dt-backfill-browser-monitor-01': {
                         table: 'cmdb_ci'
                         id: '53b16cc7072a49cc867020676c9ee8a3'
@@ -217,6 +229,62 @@ declare global {
                         table: 'em_alert_correlation_rule'
                         id: '0fe35d9505494e3c891966deaa7ae1ea'
                     }
+                    'dt-fetch-logs-call': {
+                        table: 'sys_hub_action_instance_v2'
+                        id: 'aaad19d050db4ab9b9fca313e98a4001'
+                    }
+                    'dt-fetch-logs-lookup-alias': {
+                        table: 'sys_hub_action_instance_v2'
+                        id: 'e173aaea113945dc80c79c5d7305d4e1'
+                    }
+                    'dt-fetch-logs-lookup-alias-poll': {
+                        table: 'sys_hub_action_instance_v2'
+                        id: 'aa79a2ec37b84e9baefdf102d0d02354'
+                    }
+                    'dt-fetch-logs-poll': {
+                        table: 'sys_hub_action_instance_v2'
+                        id: '4e71ae82151d4320a520604eef5867fc'
+                    }
+                    'dt-fetch-logs-set-entity-id': {
+                        table: 'sys_hub_flow_logic_instance_v2'
+                        id: 'a9bb298397e04ecabefe027addff29ad'
+                    }
+                    'dt-fetch-logs-subflow': {
+                        table: 'sys_hub_flow'
+                        id: '49f8f6ccfe534830a08672bce3b2b39d'
+                    }
+                    'dt-fetch-logs-write-worknotes': {
+                        table: 'sys_hub_action_instance_v2'
+                        id: 'e4bd411f29824ce3848cebb393f257a8'
+                    }
+                    'dt-fetch-metrics-call': {
+                        table: 'sys_hub_action_instance_v2'
+                        id: '2b590ec9217f451d885e4bae17ef49e9'
+                    }
+                    'dt-fetch-metrics-lookup-alias': {
+                        table: 'sys_hub_action_instance_v2'
+                        id: '868a327e94d94f80b6699c6535b125b3'
+                    }
+                    'dt-fetch-metrics-lookup-alias-poll': {
+                        table: 'sys_hub_action_instance_v2'
+                        id: 'e6c758c08d7043d28c7806327e4e15a9'
+                    }
+                    'dt-fetch-metrics-poll': {
+                        table: 'sys_hub_action_instance_v2'
+                        id: 'c9a0e76125c642f2b2eb2ca45e500f96'
+                    }
+                    'dt-fetch-metrics-set-entity-id': {
+                        table: 'sys_hub_flow_logic_instance_v2'
+                        id: '6f06f24ca69f42dcba62351e8b1b9e6c'
+                    }
+                    'dt-fetch-metrics-subflow': {
+                        table: 'sys_hub_flow'
+                        id: 'e641691909e240c180166a8b20f8bb4e'
+                    }
+                    'dt-fetch-metrics-write-worknotes': {
+                        table: 'sys_hub_action_instance_v2'
+                        id: '2159ca8045dd478d8b439fbc7290afa0'
+                    }
                     'dt-incident-template': {
                         table: 'em_incident_template'
                         id: '73f45376639c419c8d2503fa91d4f4f5'
@@ -225,11 +293,255 @@ declare global {
                         table: 'em_alert_management_rule'
                         id: '434ad54010874dc1b868e66325a6ac64'
                     }
+                    'dt-telemetry-rule': {
+                        table: 'em_alert_management_rule'
+                        id: '0b1fed0416664fed8727522cca7455e6'
+                    }
                     package_json: {
                         table: 'sys_module'
                         id: 'edbec6b922a64d8899c9c1f9b5a3a9f1'
                     }
                 }
+                composite: [
+                    {
+                        table: 'sys_documentation'
+                        id: '02e3802d8606424495c82c76ee6d8074'
+                        key: {
+                            name: 'var__m_sys_hub_flow_input_49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'executionId'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_input'
+                        id: '049dede9d94740969c53455a29215c12'
+                        key: {
+                            model: '49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'executionId'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_input'
+                        id: '28d181b2c9b443e9b3b715045686f8b2'
+                        key: {
+                            model: '49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'userName'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '34e814de48de40cd8e4080e1569a69bb'
+                        key: {
+                            name: 'var__m_sys_hub_flow_input_49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'alertGR'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_variable'
+                        id: '42cd5ac1525849149f8ee7225b8a9b16'
+                        key: {
+                            model: 'e641691909e240c180166a8b20f8bb4e'
+                            element: 'entityId'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_input'
+                        id: '44408805a11041d2be498585b643bc2e'
+                        key: {
+                            model: '49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'userDisplayName'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '56c69f16695b4b2d82050121a0194226'
+                        key: {
+                            name: 'var__m_sys_hub_flow_input_49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'userDisplayName'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '6118c64c83aa49e78fa20b05316ffe79'
+                        key: {
+                            name: 'var__m_sys_hub_flow_variable_49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'entityId'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '6295e3bfbcfa41df82d94250af82038a'
+                        key: {
+                            name: 'var__m_sys_hub_flow_input_e641691909e240c180166a8b20f8bb4e'
+                            element: 'alertRuleName'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_input'
+                        id: '7783949b2a9845d4840733963c5a0524'
+                        key: {
+                            model: 'e641691909e240c180166a8b20f8bb4e'
+                            element: 'userDisplayName'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_input'
+                        id: '79bcda95277e4248817498609ac577f5'
+                        key: {
+                            model: '49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'alertRuleId'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '896de8f79e704de1978278531a6dcd95'
+                        key: {
+                            name: 'var__m_sys_hub_flow_input_49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'alertRuleId'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '89c530bcfff1454084dc3825834222f8'
+                        key: {
+                            name: 'var__m_sys_hub_flow_input_e641691909e240c180166a8b20f8bb4e'
+                            element: 'alertRuleId'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_input'
+                        id: '8aa70f87922d4fa2a225983b9948b5b1'
+                        key: {
+                            model: 'e641691909e240c180166a8b20f8bb4e'
+                            element: 'userName'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'a2438e16609a4705bd77d2f434693e82'
+                        key: {
+                            name: 'var__m_sys_hub_flow_input_49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'alertRuleName'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'ae36b9a5c6624282b5f3db842e01b374'
+                        key: {
+                            name: 'var__m_sys_hub_flow_input_e641691909e240c180166a8b20f8bb4e'
+                            element: 'alertGR'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'b6d10948ca894c3fa6a11ed5f8746597'
+                        key: {
+                            name: 'var__m_sys_hub_flow_input_e641691909e240c180166a8b20f8bb4e'
+                            element: 'userName'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_input'
+                        id: 'b8e803f855354b7ba1300be179a380bf'
+                        key: {
+                            model: 'e641691909e240c180166a8b20f8bb4e'
+                            element: 'alertRuleName'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_input'
+                        id: 'be5926ebae8445d09ac0d084a887a541'
+                        key: {
+                            model: 'e641691909e240c180166a8b20f8bb4e'
+                            element: 'alertGR'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_input'
+                        id: 'd029b0d9215a451396330fa3539a75c0'
+                        key: {
+                            model: 'e641691909e240c180166a8b20f8bb4e'
+                            element: 'executionId'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_input'
+                        id: 'd20bb69a0ae54b2b9e7474849d955c19'
+                        key: {
+                            model: 'e641691909e240c180166a8b20f8bb4e'
+                            element: 'alertRuleId'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_variable'
+                        id: 'dd69471172d04eaf8de7959b5ec5e02e'
+                        key: {
+                            model: '49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'entityId'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_input'
+                        id: 'de62afdc181d44ddb1e2752be8f33893'
+                        key: {
+                            model: '49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'alertRuleName'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'e73eaabf637c439fbe10ab29d900e64d'
+                        key: {
+                            name: 'var__m_sys_hub_flow_input_e641691909e240c180166a8b20f8bb4e'
+                            element: 'executionId'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'e819519e7c894cb680a9e0acc91cfb46'
+                        key: {
+                            name: 'var__m_sys_hub_flow_input_49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'userName'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_hub_flow_input'
+                        id: 'f1235c8a22314271a20401fe6deb5173'
+                        key: {
+                            model: '49f8f6ccfe534830a08672bce3b2b39d'
+                            element: 'alertGR'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'f9c8eb0042e54a9d90ef45ca975ebbd1'
+                        key: {
+                            name: 'var__m_sys_hub_flow_input_e641691909e240c180166a8b20f8bb4e'
+                            element: 'userDisplayName'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'fe832ef877314c7a93a972f6cea1a061'
+                        key: {
+                            name: 'var__m_sys_hub_flow_variable_e641691909e240c180166a8b20f8bb4e'
+                            element: 'entityId'
+                            language: 'en'
+                        }
+                    },
+                ]
             }
         }
     }
