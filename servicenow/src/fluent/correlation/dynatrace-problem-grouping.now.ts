@@ -80,11 +80,14 @@ Record({
             return null;
         }
         var content = (parsed && parsed.additional_content) ? String(parsed.additional_content) : '';
-        var problemMatch = content.match(/dt_problem_display_id=(P-[0-9]+)/);
+        // Anchored to a key boundary (start of string, "{", or ", ") so a
+        // hypothetical future key merely ending in the same suffix (e.g.
+        // "some_other_dt_problem_display_id") can't false-match.
+        var problemMatch = content.match(/(?:^|[{,]\s*)dt_problem_display_id=(P-[0-9]+)/);
         if (!problemMatch) {
             return null;
         }
-        var rootCauseMatch = content.match(/dt\\.davis\\.is_rootcause_relevant=(true|false)/);
+        var rootCauseMatch = content.match(/(?:^|[{,]\s*)dt\\.davis\\.is_rootcause_relevant=(true|false)/);
         return {
             problemId: problemMatch[1],
             isRootCause: rootCauseMatch ? (rootCauseMatch[1] === 'true') : false,
@@ -96,6 +99,10 @@ Record({
         return JSON.stringify({});
     }
 
+    // Keep in sync with this rule record's own time_difference field (60,
+    // set alongside this script) -- the advanced-rule script has no handle
+    // back to its own em_alert_correlation_rule record, so this can't be
+    // read live; it's a plain duplicate that must be edited in both places.
     var timeDifferenceInMinutes = 60;
     var timeDifferenceBetweenAlerts = new GlideDateTime(currentAlert.getValue('initial_remote_time'));
     timeDifferenceBetweenAlerts.subtract(Number(timeDifferenceInMinutes) * 1000 * 60);
@@ -113,7 +120,7 @@ Record({
 
     var others = [];
     var existingRootCauseSysId = null;
-    while (gr._next()) {
+    while (gr.next()) {
         var otherSysId = gr.getUniqueValue();
         others.push(otherSysId);
         var other = extractProblemAndRootCause(gr.getValue('additional_info'));
