@@ -129,3 +129,46 @@ Record({
             'Creates one incident per Dynatrace Davis problem, from the root cause alert only (correlation_rule_group=1, set by the task-10 em_alert_correlation_rule on the alert whose event carried dt.davis.is_rootcause_relevant=true). Supporting alerts in the group never carry that role and so never create their own incidents.',
     },
 })
+
+// --- Follow-up fix: this rule was silently auto-deactivated -----------------
+// Discovered live, well after Task 11 originally shipped: this rule had
+// `active: true` in source on every deploy, but the live record read
+// `active: false, error_msg: "No active actions"`. Root cause is a completely
+// separate OOB business rule, "Deactive rule without actions" (before,
+// em_alert_management_rule, order 100, unconditional):
+//
+//   if (!(evtMgmtAlertManagementCommons.activeActionsExist(current.getUniqueValue()))) {
+//       current.active = false;
+//       current.error_msg = "No active actions";
+//   }
+//
+// Every em_alert_management_rule on this instance needs at least one active
+// child `em_alert_management_action` row or the platform force-deactivates
+// it, regardless of `type`/`incident_template`. This rule never had one --
+// `type: 'incident'` plus `incident_template` alone was not sufficient, and
+// no live example anywhere on this instance suggested otherwise until this
+// was investigated directly.
+//
+// The actual mechanism: `type: 'incident'` rules on this instance create the
+// incident via a Subflow action, not via `incident_template` (which appears
+// vestigial/legacy) or `type` alone. Confirmed by inspecting the one other
+// live `type: 'incident'` rule that genuinely creates incidents ("Create
+// Incident Manually", sys_id fac1e85df3611300fba998d075612ba1, OOB,
+// `incident_template` empty): its only action is an
+// `em_alert_man_m2m_rule_flow` pointing at the OOB Subflow "Create Incident"
+// (internal_name `create_incident`, sys_id
+// 45454f6193330300415c74aff67ffbfb). That is the standard, working mechanism
+// on this instance -- reused here rather than building a custom subflow,
+// same as Task 13's precedent of preferring an existing verified pattern
+// over an unverified new one.
+Record({
+    $id: Now.ID['dt-promote-primary-to-incident-action'],
+    table: 'em_alert_man_m2m_rule_flow',
+    data: {
+        management_rule: Now.ref('em_alert_management_rule', 'dt-promote-primary-to-incident'),
+        sub_flow: Now.ref('sys_hub_flow', '45454f6193330300415c74aff67ffbfb'),
+        active: true,
+        execution: 1,
+        executions_limit: 1,
+    },
+})

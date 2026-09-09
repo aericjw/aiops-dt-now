@@ -229,6 +229,10 @@ declare global {
                         table: 'em_alert_correlation_rule'
                         id: '0fe35d9505494e3c891966deaa7ae1ea'
                     }
+                    'dt-correlation-sweep-job': {
+                        table: 'sysauto_script'
+                        id: '4a8917fe07d6443f94d27ed9d223bfa2'
+                    }
                     'dt-fetch-logs-call': {
                         table: 'sys_hub_action_instance_v2'
                         id: 'aaad19d050db4ab9b9fca313e98a4001'
@@ -300,6 +304,10 @@ declare global {
                     'dt-promote-primary-to-incident': {
                         table: 'em_alert_management_rule'
                         id: '434ad54010874dc1b868e66325a6ac64'
+                    }
+                    'dt-promote-primary-to-incident-action': {
+                        table: 'em_alert_man_m2m_rule_flow'
+                        id: '131188c47f4249fc97b331da187c9604'
                     }
                     'dt-rule-populate-kb-url': {
                         table: 'sys_script'
