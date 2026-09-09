@@ -18,6 +18,21 @@ landed on the instance. It does not report success unless the rename is
 confirmed live; if the platform drops the write (the expected outcome per
 the finding above), it says so explicitly rather than papering over it.
 
+I6 fix (final whole-branch review, 2026-09-08): this script used to leave
+the source-rewrite in place even when the live rename was confirmed to
+have failed -- recreating, on every run, the exact defect a prior task's
+review already caught once (repo source diverging from live reality: the
+files say ZZ-RETIRED-..., the live CMDB CI records don't). Since the
+docstring above already documents that this rename is EXPECTED to fail on
+this platform, running this script with no arguments was guaranteed to
+silently damage the repo that way. Fixed: the original contents of every
+file under BACKFILL_DIR are captured before rewriting, and restored
+automatically if verification does not confirm every record renamed live
+(this applies whether or not --skip-build was passed - "not confirmed
+live" is the bar, not "no exception was thrown"). The source mutation is
+only left in place when the rename is independently verified to have
+actually landed.
+
 Usage:
     python3 scripts/neutralize_cmdb_backfill.py [--prefix ZZ-RETIRED-] [--skip-build]
 """
@@ -44,6 +59,20 @@ TABLES = {
     "frontend": "cmdb_ci_web_application",
     "browser_monitor": "cmdb_ci",
 }
+
+
+def capture_originals() -> dict:
+    """Snapshot the current content of every backfill source file, so it can
+    be restored if the live rename this script is about to attempt is not
+    confirmed to have landed (I6 fix)."""
+    return {path: path.read_text() for path in sorted(BACKFILL_DIR.glob("*.now.ts"))}
+
+
+def restore_originals(originals: dict) -> None:
+    for path, text in originals.items():
+        path.write_text(text)
+    print(f"==> reverted source rewrite in {len(originals)} file(s) under {BACKFILL_DIR} "
+          f"(live rename was not confirmed)")
 
 
 def rewrite_names(prefix: str) -> int:
@@ -133,6 +162,10 @@ def main():
     if not BACKFILL_DIR.is_dir():
         sys.exit(f"backfill source dir not found: {BACKFILL_DIR}")
 
+    # I6 fix: snapshot before mutating, so the rewrite can be reverted if the
+    # live rename this script attempts is not confirmed to have landed.
+    originals = capture_originals()
+
     changed = rewrite_names(args.prefix)
     print(f"==> rewrote {changed} name field(s) in {BACKFILL_DIR}")
 
@@ -141,17 +174,18 @@ def main():
 
     success = verify(args.prefix)
     if not success:
+        restore_originals(originals)
         print(
             "\nWARNING: one or more backfilled CMDB CI records did NOT pick up "
             "the rename. This matches the confirmed finding in task-9b-report.md: "
             "field updates to already-created CMDB CI records are silently dropped "
             "by this PDI's Fluent/now-sdk write path (same class of platform "
-            "protection as the confirmed-non-deletable finding). The source files "
-            "ARE correctly updated with the prefix, so re-running this script will "
-            "retry automatically if the underlying protection is ever lifted (e.g. "
-            "a ServiceNow admin disabling CMDB CI update protection for this scope, "
-            "or applying the rename via a background script instead of the "
-            "Table/Update-Set API).",
+            "protection as the confirmed-non-deletable finding). The source "
+            "rewrite has been REVERTED (I6 fix, 2026-09-08) since the rename did "
+            "not land live -- re-run this script to retry if the underlying "
+            "platform protection is ever lifted (e.g. a ServiceNow admin "
+            "disabling CMDB CI update protection for this scope, or applying the "
+            "rename via a background script instead of the Table/Update-Set API).",
             file=sys.stderr,
         )
         sys.exit(1)
