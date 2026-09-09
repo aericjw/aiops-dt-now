@@ -114,19 +114,21 @@ earlier draft of `docs/execution/RESUME.md`).
   than its OOB "KB article" meaning. The original mechanism (a field
   mapping in the ingestion workflow) was dead code -- it wrote to
   `em_event.kb_url`, a column that does not exist on `em_event` at all, so
-  it silently no-opped. Fixed: a `sys_script` Business Rule on `em_alert`
-  (before insert, `source=Dynatrace`, see
-  `servicenow/src/fluent/alert-actions/dynatrace-telemetry.now.ts`,
-  `dt-rule-populate-kb-url`) now parses `dt_problem_url` out of the alert's
-  own `additional_info` and sets `kb_url` directly at insert time. Deployed
-  and confirmed live (the business rule exists with the right
-  collection/when/condition, and its regex is correctly escaped) -- but no
-  new Dynatrace alert arrived in the ~20 minutes after this fix was
-  deployed to observe a freshly-created record's `kb_url` value live. The
-  regex logic itself was independently run against a real captured
-  `additional_info` payload and correctly extracted the URL, so this is
-  fixed-by-inspection-and-unit-check but not yet live-observed on a brand
-  new alert -- worth a spot-check next time a Dynatrace problem fires.
+  it silently no-opped. That part is fixed and confirmed removed live.
+  **The replacement is still broken, and the exact bug is known**: the new
+  `sys_script` Business Rule (`servicenow/src/fluent/alert-actions/dynatrace-telemetry.now.ts`,
+  `dt-rule-populate-kb-url`) sets `condition: 'source=Dynatrace'`, but
+  `sys_script.condition` is a JavaScript boolean *expression* field
+  (`internal_type: condition_string`), not the encoded-query field --
+  `source=Dynatrace` throws a `ReferenceError` on the undefined identifier
+  `Dynatrace` every time it's evaluated, so the rule never runs, on every
+  `em_alert` insert instance-wide. **One-line fix, not yet applied**: change
+  `condition: 'source=Dynatrace'` to `filter_condition: 'source=Dynatrace^EQ'`
+  (the actual encoded-query field, matching every other rule on this
+  instance's own convention -- verified against `sys_dictionary` and 0/N
+  instance-wide precedent for encoded syntax in `condition`). Until this is
+  applied, "Open problem in Dynatrace" continues to show the OOB default
+  empty KB article link.
 
 ### Open / accepted, not fixed
 
@@ -156,24 +158,76 @@ earlier draft of `docs/execution/RESUME.md`).
   `byEntityKey` mapping in
   `servicenow/src/fluent/flows/dynatrace-fetch-metrics-subflow.now.ts`
   rather than assuming the fallback is good enough.
-- **Whether the correlation rule's fixes actually flip `correlation_rule_group`
-  live is unconfirmed** (spec section 16, V6/V7): this review fixed two real
-  bugs in the correlation script (a broken regex escape that meant grouping
-  never worked at all, and a gating bug that would have caused duplicate
-  incidents once the regex was fixed) and unit-tested the fixed logic
-  against a real captured payload (`tests/test_correlation_grouping.js`).
-  But live-observing this instance after the fix, a solo root-cause Davis
-  problem's alert -- exactly the case now expected to self-promote to
-  PRIMARY -- stayed at `correlation_rule_group=0` at least 15 minutes after
-  creation, and `em_agg_group` shows **zero groups created for ANY alert
-  source since 2026-06-24** on this whole PDI, not just Dynatrace. This
-  suggests either a longer async processing delay than observed, or a
-  platform/entitlement gap in whether "advanced" (script-based)
-  `em_alert_correlation_rule` records are invoked at all here, independent
-  of the script's own correctness -- `evt_mgmt.enable_alert_correlation` is
-  `true` and the relevant plugins are active, so it isn't an obviously
-  disabled feature. Treat V6/V7 as "script-level fix complete and
-  unit-verified; engine-level live effect not confirmed," not as a clean
-  PASS, until someone with platform-log access (a `syslog` query for
-  correlation-engine activity hit this session's 30-second API timeout) or
-  a ServiceNow support case resolves the open question.
+  **Residual, not yet fixed**: the `service` class's metric
+  (`dt.service.request.count`) is filtered on `dt.smartscape_source.id`,
+  a dimension that metric doesn't carry -- confirmed live, a real service
+  entity id returns zero records. Since `service` is this pipeline's
+  dominant alert class, the fetch-metrics action currently returns empty
+  for most alerts it'll actually be invoked on. Fix: use the
+  `dt.entity.service` dimension instead for the `service` case;
+  `k8s_pod`'s metric likely has the same kind of dimension mismatch
+  (`CONTAINER-*` vs. the `CLOUD_APPLICATION_INSTANCE-*` entity pods are
+  actually exposed as) and should be checked the same way before relying
+  on it.
+- **ARCHITECTURAL FINDING: correlation is structurally never invoked for any
+  alert this pipeline creates. This is the single most important open item
+  in the whole project.** (spec section 16, V6/V7). The correlation script
+  itself has two real bugs fixed and unit-tested (a broken regex escape
+  that meant grouping never worked at all, and a gating bug that would have
+  caused duplicate incidents once the regex was fixed --
+  `tests/test_correlation_grouping.js`). But live-observing this instance
+  after both fixes, eight separate solo root-cause Davis-problem alerts
+  (across a 36+ minute window, comfortably after the fix deployed) all
+  stayed at `correlation_rule_group=0`, and `em_agg_group` shows **zero
+  groups created for ANY alert source since 2026-06-24** on this whole PDI --
+  not a Dynatrace-specific symptom, not a processing-delay artifact.
+
+  **Root cause, identified and named**: ServiceNow's own OOB business rule
+  that invokes correlation ("Calculate correlation rule",
+  `sys_script` on `em_alert`) only calls
+  `alertManager.calculateAlertCorrelation(current)` for an Open/Reopen alert
+  when `!alertManager.isThreadProcessingEvents()` is true. Every alert on
+  this pipeline is created BY the Event Management event-processing thread
+  converting `em_event` -> `em_alert` -- i.e. from inside exactly the
+  thread this guard excludes. So correlation is never invoked for this
+  alert-creation path, independent of anything this project's script does
+  or how correctly it's written. (The `else` branch, which runs on every
+  other state change including Close, has no such guard -- a closed
+  Dynatrace alert was observed passing through correlation post-fix, and
+  produced no group either, consistent with the close path only handling
+  group teardown rather than initial grouping.)
+
+  **This means Tasks 10 and 11's entire design -- ServiceNow-native
+  `em_alert_correlation_rule` + `em_alert_management_rule` -- cannot
+  produce a grouped/promoted incident for any alert this pipeline creates,
+  as currently architected.** It is not a residual bug to patch; it is a
+  structural mismatch between how this pipeline creates alerts and how
+  ServiceNow's OOB correlation trigger decides to run. V6/V7 ("N alerts ->
+  1 incident") cannot pass with the current design, no matter how correct
+  the correlation script is.
+
+  **Options for whoever picks this up next** (not decided by this build --
+  a genuine design choice):
+  1. Find a way to invoke `calculateAlertCorrelation()` from outside the
+     guarded event-processing thread for alerts this pipeline creates --
+     e.g. a scheduled job that re-processes recent Dynatrace alerts on a
+     short interval (the close path's unguarded `else` branch is evidence
+     this can work when invoked from a different context).
+  2. Replace ServiceNow's native correlation/promotion mechanism with a
+     custom scripted equivalent (e.g. a scheduled script, or a Flow
+     Designer flow) that doesn't depend on the OOB trigger at all.
+  3. Raise this with ServiceNow support/your account team: ask specifically
+     whether `isThreadProcessingEvents()` has a documented bypass or
+     configuration for integration-created alerts, since this is presumably
+     not unique to this project -- any integration inserting alerts
+     programmatically via the standard event pipeline would hit the same
+     wall.
+
+  A cheap, low-risk way to confirm this diagnosis with a live test (not
+  attempted during this build, since it requires a write outside this
+  session's approved scope): manually reopen an existing Dynatrace alert
+  from the Service Operations Workspace UI (or a background script) rather
+  than letting it arrive via the event pipeline. That state change happens
+  outside the guarded thread and should route through the same OOB rule
+  with `isThreadProcessingEvents()` false -- if it produces a populated
+  `em_agg_group`, that's a clean confirmation of the diagnosis above.
