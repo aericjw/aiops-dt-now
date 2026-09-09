@@ -301,6 +301,10 @@ declare global {
                         table: 'em_alert_management_rule'
                         id: '434ad54010874dc1b868e66325a6ac64'
                     }
+                    'dt-rule-populate-kb-url': {
+                        table: 'sys_script'
+                        id: '2b66fd4847d54ba1b080d35a158c5acb'
+                    }
                     'dt-telemetry-rule': {
                         table: 'em_alert_management_rule'
                         id: '0b1fed0416664fed8727522cca7455e6'

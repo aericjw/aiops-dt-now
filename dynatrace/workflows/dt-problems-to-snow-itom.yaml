@@ -131,10 +131,19 @@ tasks:
         - id: f-additional-info
           key: additional_info
           value: '{{ _.item }}'
-        - id: f-dt-problem-url
-          key: kb_url
-          value: '{{ _.item["dt_problem_url"] }}'
       tableName: "{{ input('snow_table') }}"
+      # I1 fix (final whole-branch review, 2026-09-08): a `kb_url` mapping
+      # used to be listed here, but snow_table is em_event, which has no
+      # kb_url column at all (confirmed via sys_dictionary: 0 rows for
+      # name=em_event^element=kb_url) -- the mapping compiled and deployed
+      # without error but was silently dropped by ServiceNow at runtime.
+      # dt_problem_url still reaches em_alert, unchanged, via the
+      # additional_info mapping above (it's embedded in additional_content).
+      # em_alert.kb_url is now populated instead by a `sys_script` Business
+      # Rule on em_alert (see
+      # servicenow/src/fluent/alert-actions/dynatrace-telemetry.now.ts,
+      # dt-rule-populate-kb-url) that parses dt_problem_url back out of
+      # additional_info at insert time.
     name: send_event_to_servicenow
     position:
       x: 0

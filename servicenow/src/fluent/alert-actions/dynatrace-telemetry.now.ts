@@ -26,28 +26,46 @@ import '../flows/dynatrace-fetch-metrics-subflow.now'
 // is not actually empty -- live alerts already carry an OOB computed default
 // (`/kb_view.do?sysparm_article=`) rather than nothing, so at first glance
 // this looked like neither of the brief's two outcomes cleanly applied.
-// Resolution: that default only applies when nothing else sets the field
-// explicitly at insert time. The Dynatrace ingestion workflow
-// (dynatrace/workflows/dt-problems-to-snow-itom.yaml) already explicitly
-// maps a dozen other em_alert columns this same way (message_key, source,
-// resource, node, type, ...), so adding one more explicit mapping
-// (`kb_url: dt_problem_url`, added in this task) overrides the default on
-// every future alert exactly like Outcome A describes ("If the column
-// exists but is empty, amend the Dynatrace workflow to populate it").
-// This was preferred over adding a brand-new custom column via `Table({
-// augments: 'em_alert', ... })` -- a mechanism unused anywhere else in this
-// project and with more moving parts (build-time schema validation, an
-// unfamiliar Column-type API) for no behavioral benefit over reusing an
-// existing, if cosmetically mislabeled, URL column that operators only ever
-// see via the named "Open problem in Dynatrace" button, never the raw field
-// label. Net effect: Outcome A applies. `em_launch_application` is used for
-// action 1, and it is the only one of the three actions that needs no
-// Dynatrace credential. Deployed and confirmed via live query (rule, action
-// record, `${kb_url}` template, and the ingestion workflow's kb_url mapping
-// all present on the live instance) -- but the UI click-through itself
-// (opening a live alert in Service Operations Workspace and watching the
-// button navigate to the right Dynatrace problem) was not independently
-// observed this session (see task-13-report.md).
+// Resolution (ORIGINAL, now superseded -- see I1 fix below): the original
+// task-13 approach added a `kb_url: dt_problem_url` field mapping to
+// dynatrace/workflows/dt-problems-to-snow-itom.yaml's send_event_to_servicenow
+// step. That step writes to em_event (the workflow's snow_table, per its own
+// header comment: "ServiceNow performs dedup, reopen and close natively
+// using message_key" -- deliberately NOT em_alert, which the platform's own
+// Alert Management engine generates FROM em_event records it processes).
+// The mapping compiled and deployed without error, but was silently dropped
+// at runtime: a `sys_dictionary` query confirmed em_event has NO kb_url
+// column at all (0 rows for name=em_event^element=kb_url, vs. em_alert's
+// kb_url which does exist, internal_type url). ServiceNow's OOB event-to-
+// alert transform only carries over fields that exist by the same name on
+// BOTH tables (this is how `cmdb_ci` carries through, per Task 11's
+// finding -- confirmed here too: cmdb_ci exists on both em_event and
+// em_alert). kb_url has no em_event-side counterpart for that mechanism to
+// use, so the mapping was a no-op: live alerts kept showing the OOB default
+// `/kb_view.do?sysparm_article=` (an empty, non-functional KB article link).
+//
+// --- I1 fix (final whole-branch review, 2026-09-08) ------------------------
+// Removed the dead kb_url mapping from the workflow (there is no column on
+// em_event for it to write to). Replaced with a `sys_script` Business Rule
+// (before insert, on em_alert -- see the Record below) that runs when the
+// platform creates the em_alert record: it parses the alert's own
+// additional_info (already correctly populated by the workflow's
+// `additional_info: {{ _.item }}` mapping, and already confirmed to carry
+// dt_problem_url embedded in its Java-map-toString additional_content
+// string, per Task 10/12's parsing work) with the same anchored-regex
+// approach as the correlation script, and sets kb_url to the extracted URL
+// before the record is inserted. `em_launch_application`'s existing
+// `${kb_url}` template (action 1, unchanged) then just works, because
+// kb_url is a genuine em_alert column populated at insert time -- no
+// `${}` substitution into JSON keys inside a string field is needed, and
+// the well-understood limits of `${field}` substitution documented above
+// (still true) are worked around rather than fought.
+//
+// Live-verified 2026-09-08: after deploy, queried a live em_alert record
+// (source=Dynatrace, most recent by sys_created_on) and confirmed kb_url now
+// holds a real https://.../problem/P-NNNNNNNN URL matching that alert's own
+// dt_problem_url, not the OOB default -- see the fix commit message for the
+// exact sys_id and value observed.
 //
 // Actions 2 and 3 (fetch logs / fetch metrics) both need the DQL execution
 // API, which needs the connection alias + read-only API token that
@@ -109,7 +127,8 @@ Record({
 
 // Action 1: open the Dynatrace problem. Credential-free -- deployed and
 // confirmed via live query this session; the UI click-through itself was
-// not independently observed (see task-13-report.md).
+// not independently observed (see task-13-report.md). kb_url is populated
+// by the Business Rule below (I1 fix), not by the ingestion workflow.
 Record({
     $id: Now.ID['dt-action-open-problem'],
     table: 'em_launch_application',
@@ -120,6 +139,61 @@ Record({
         management_rule: Now.ref('em_alert_management_rule', 'dt-telemetry-rule'),
         display_name: 'Open problem in Dynatrace',
         url: '${kb_url}',
+    },
+})
+
+// I1 fix: populate em_alert.kb_url with the Dynatrace problem URL at insert
+// time, by parsing it out of the alert's own additional_info. This is the
+// only mechanism confirmed to work -- see the long comment above for why
+// the ingestion-workflow field mapping this originally relied on is dead
+// (em_event has no kb_url column) and why `${field}` substitution in
+// em_launch_application.url cannot reach a JSON key inside additional_info
+// directly. Mirrors the anchored-key-boundary regex approach used in
+// ../correlation/dynatrace-problem-grouping.now.ts (start-of-string, "{",
+// or ", " boundary, so a hypothetical future key merely ending in
+// "dt_problem_url" can't false-match), and is careful with the same
+// backtick-template-literal escaping foot-gun that caused C1 there: `\s`
+// (single backslash) collapses to a literal "s" inside a template literal,
+// so `\\s` is used here to produce a real `\s` token in the deployed script.
+Record({
+    $id: Now.ID['dt-rule-populate-kb-url'],
+    table: 'sys_script',
+    data: {
+        // sys_script.name has max_length=40 (confirmed via sys_dictionary) --
+        // the original, longer name was silently truncated by the platform
+        // on deploy. Kept short and unambiguous to avoid that.
+        name: 'Dynatrace - populate alert kb_url',
+        collection: 'em_alert',
+        active: true,
+        when: 'before',
+        order: 150,
+        action_insert: true,
+        action_update: false,
+        action_query: false,
+        action_delete: false,
+        condition: 'source=Dynatrace',
+        description: 'Extracts dt_problem_url out of additional_info (a Java Map#toString string embedded in a JSON wrapper, not directly addressable JSON) and sets kb_url so the "Open problem in Dynatrace" launch action has a real URL to navigate to instead of the OOB empty-KB-article default.',
+        script: `(function populateKbUrlFromProblemUrl(current) {
+    var raw = current.getValue('additional_info');
+    if (!raw) {
+        return;
+    }
+    var parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch (e) {
+        return;
+    }
+    var content = (parsed && parsed.additional_content) ? String(parsed.additional_content) : '';
+    // Anchored to a key boundary (start of string, "{", or ", ") like the
+    // correlation script's regexes, and captures up to the next key
+    // boundary (", " or a closing "}") rather than to end-of-string, since
+    // additional_content may have more key=value pairs after this one.
+    var urlMatch = content.match(/(?:^|[{,]\\s*)dt_problem_url=([^,}]+)/);
+    if (urlMatch) {
+        current.setValue('kb_url', urlMatch[1].replace(/\\s+$/, ''));
+    }
+})(current);`,
     },
 })
 
