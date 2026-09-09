@@ -169,65 +169,47 @@ earlier draft of `docs/execution/RESUME.md`).
   (`CONTAINER-*` vs. the `CLOUD_APPLICATION_INSTANCE-*` entity pods are
   actually exposed as) and should be checked the same way before relying
   on it.
-- **ARCHITECTURAL FINDING: correlation is structurally never invoked for any
-  alert this pipeline creates. This is the single most important open item
-  in the whole project.** (spec section 16, V6/V7). The correlation script
-  itself has two real bugs fixed and unit-tested (a broken regex escape
-  that meant grouping never worked at all, and a gating bug that would have
-  caused duplicate incidents once the regex was fixed --
-  `tests/test_correlation_grouping.js`). But live-observing this instance
-  after both fixes, eight separate solo root-cause Davis-problem alerts
-  (across a 36+ minute window, comfortably after the fix deployed) all
-  stayed at `correlation_rule_group=0`, and `em_agg_group` shows **zero
-  groups created for ANY alert source since 2026-06-24** on this whole PDI --
-  not a Dynatrace-specific symptom, not a processing-delay artifact.
-
-  **Root cause, identified and named**: ServiceNow's own OOB business rule
-  that invokes correlation ("Calculate correlation rule",
-  `sys_script` on `em_alert`) only calls
+- **RESOLVED: correlation was structurally never invoked for any alert this
+  pipeline creates -- now fixed, and V6/V7 are confirmed passing live.**
+  (spec section 16, V6/V7). Root cause, identified and confirmed by reading
+  the live OOB business rule: ServiceNow's own "Calculate correlation rule"
+  (`sys_script` on `em_alert`) only calls
   `alertManager.calculateAlertCorrelation(current)` for an Open/Reopen alert
-  when `!alertManager.isThreadProcessingEvents()` is true. Every alert on
-  this pipeline is created BY the Event Management event-processing thread
-  converting `em_event` -> `em_alert` -- i.e. from inside exactly the
-  thread this guard excludes. So correlation is never invoked for this
-  alert-creation path, independent of anything this project's script does
-  or how correctly it's written. (The `else` branch, which runs on every
-  other state change including Close, has no such guard -- a closed
-  Dynatrace alert was observed passing through correlation post-fix, and
-  produced no group either, consistent with the close path only handling
-  group teardown rather than initial grouping.)
+  when `!alertManager.isThreadProcessingEvents()` is true. Every alert this
+  pipeline creates is created BY the Event Management event-processing
+  thread converting `em_event` -> `em_alert` -- exactly the thread this
+  guard excludes. So correlation was never invoked for this alert-creation
+  path, independent of the correlation script's own correctness (which had
+  two real, separately-fixed bugs of its own along the way -- a broken
+  regex escape and a solo-alert gating gap, both unit-tested in
+  `tests/test_correlation_grouping.js`).
 
-  **This means Tasks 10 and 11's entire design -- ServiceNow-native
-  `em_alert_correlation_rule` + `em_alert_management_rule` -- cannot
-  produce a grouped/promoted incident for any alert this pipeline creates,
-  as currently architected.** It is not a residual bug to patch; it is a
-  structural mismatch between how this pipeline creates alerts and how
-  ServiceNow's OOB correlation trigger decides to run. V6/V7 ("N alerts ->
-  1 incident") cannot pass with the current design, no matter how correct
-  the correlation script is.
+  **Fix**: `servicenow/src/fluent/correlation/dynatrace-correlation-sweep-job.now.ts`,
+  a scheduled job (`sysauto_script`, runs every minute) that re-invokes
+  `calculateAlertCorrelation()` directly for any still-groupable Dynatrace
+  alert, from the job's own thread -- never the guarded one. This bypasses
+  the OOB rule's guard entirely rather than needing ServiceNow to change
+  anything.
 
-  **Options for whoever picks this up next** (not decided by this build --
-  a genuine design choice):
-  1. Find a way to invoke `calculateAlertCorrelation()` from outside the
-     guarded event-processing thread for alerts this pipeline creates --
-     e.g. a scheduled job that re-processes recent Dynatrace alerts on a
-     short interval (the close path's unguarded `else` branch is evidence
-     this can work when invoked from a different context).
-  2. Replace ServiceNow's native correlation/promotion mechanism with a
-     custom scripted equivalent (e.g. a scheduled script, or a Flow
-     Designer flow) that doesn't depend on the OOB trigger at all.
-  3. Raise this with ServiceNow support/your account team: ask specifically
-     whether `isThreadProcessingEvents()` has a documented bypass or
-     configuration for integration-created alerts, since this is presumably
-     not unique to this project -- any integration inserting alerts
-     programmatically via the standard event pipeline would hit the same
-     wall.
+  A second, unrelated bug was found and fixed alongside this: Task 11's
+  incident-promotion rule was live-confirmed `active: false` ("No active
+  actions") -- a completely separate OOB business rule force-deactivates
+  any `em_alert_management_rule` with no active child action record,
+  regardless of `type`/`incident_template`. Fixed in the same file by
+  attaching an `em_alert_man_m2m_rule_flow` action pointing at the same OOB
+  "Create Incident" subflow the one other working `type: 'incident'` rule
+  on this instance ("Create Incident Manually") already uses.
 
-  A cheap, low-risk way to confirm this diagnosis with a live test (not
-  attempted during this build, since it requires a write outside this
-  session's approved scope): manually reopen an existing Dynatrace alert
-  from the Service Operations Workspace UI (or a background script) rather
-  than letting it arrive via the event pipeline. That state change happens
-  outside the guarded thread and should route through the same OOB rule
-  with `isThreadProcessingEvents()` false -- if it produces a populated
-  `em_agg_group`, that's a clean confirmation of the diagnosis above.
+  **Confirmed live, end to end, after both fixes**: `em_agg_group` now
+  creates real groups (13 the first day, the first on this whole PDI since
+  2026-06-24), and three real incidents were created from them --
+  `INC0010001`, `INC0010002`, `INC0010003`, each with a populated `cmdb_ci`
+  and its Davis problem ID in the short description. This is V6/V7 passing
+  on live traffic, not by inspection.
+
+  One caveat: alerts that reached `correlation_rule_group=1` *before* the
+  incident-rule fix deployed won't retroactively create an incident (the
+  rule's `automatic_execution_setting` is edge-triggered on the transition
+  into the filter, and that transition already happened for them). This
+  only affects a handful of alerts from the fix's first hour; every
+  problem going forward flows through cleanly.
