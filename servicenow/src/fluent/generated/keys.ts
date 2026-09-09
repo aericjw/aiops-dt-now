@@ -367,6 +367,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_hub_flow_variable'
+                        id: '2baeb0743dec4428851a6bc00cf6cacc'
+                        key: {
+                            model: 'e641691909e240c180166a8b20f8bb4e'
+                            element: 'metricName'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '34e814de48de40cd8e4080e1569a69bb'
                         key: {
@@ -490,6 +498,15 @@ declare global {
                         key: {
                             model: 'e641691909e240c180166a8b20f8bb4e'
                             element: 'userName'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'a164168f227844d29920bdbb0ae043b4'
+                        key: {
+                            name: 'var__m_sys_hub_flow_variable_e641691909e240c180166a8b20f8bb4e'
+                            element: 'metricName'
+                            language: 'en'
                         }
                     },
                     {

@@ -32,6 +32,7 @@ export const dtFetchMetricsSubflow = Subflow(
         },
         flowVariables: {
             entityId: StringColumn({ label: 'Entity ID' }),
+            metricName: StringColumn({ label: 'Metric name' }),
         },
     },
     (params) => {
@@ -48,6 +49,38 @@ export const dtFetchMetricsSubflow = Subflow(
                     var val = m ? m[1] : '';
                     return (val && val !== 'null') ? val : '';
                 `),
+                // I5 fix (final whole-branch review, 2026-09-08): the query
+                // used to hardcode dt.host.cpu.usage for every entity class,
+                // but a live 7-day distribution of this tenant's Davis events
+                // (dtctl query, 2026-09-08) shows the pipeline's alerts are
+                // overwhelmingly process/k8s_pod/service/environment, not
+                // host (136 of the sampled ~112k events) -- so the old query
+                // returned empty results for nearly every real alert.
+                // Selects a representative metric per dt_entity_key (parsed
+                // out of additional_info the same way entityId is above).
+                // Each candidate metric name was checked with
+                // `dtctl verify query` (syntactically valid on tacocorp) and,
+                // where the entity class has any live data on this tenant,
+                // with a real `dtctl query` execution (see fix commit for
+                // exact counts). frontend's metric
+                // (dt.rum.frontend.action.count) is syntactically valid but
+                // returned 0 records on tacocorp -- this tenant has no RUM
+                // data to verify against; documented in docs/USER-SETUP.md.
+                // Falls back to dt.host.cpu.usage (the original default) for
+                // any class not explicitly listed, and for host itself.
+                metricName: wfa.inlineScript(`
+                    var info = ${wfa.dataPill((params.inputs.alertGR as any).additional_info, 'string')} || '';
+                    var m = /dt_entity_key=([^,}]*)/.exec(info);
+                    var key = m ? m[1] : '';
+                    var byEntityKey = {
+                        'process': 'dt.process.cpu.usage',
+                        'service': 'dt.service.request.count',
+                        'k8s_pod': 'dt.kubernetes.container.cpu_usage',
+                        'k8s_node': 'dt.host.cpu.usage',
+                        'frontend': 'dt.rum.frontend.action.count',
+                    };
+                    return byEntityKey[key] || 'dt.host.cpu.usage';
+                `),
             }
         )
 
@@ -62,12 +95,15 @@ export const dtFetchMetricsSubflow = Subflow(
 
         // NOTE: there is no single metric key that applies to every Dynatrace
         // entity type (a host's relevant metric is not a service's or a
-        // process's). This query is a representative default -- it is NOT
+        // process's). The metric is now selected per dt_entity_key (see the
+        // metricName flow variable set above, I5 fix) rather than hardcoded,
+        // but the per-class mapping is still a representative default for a
+        // handful of the most common classes on this tenant -- it is NOT
         // guaranteed to return data for every entity class the alert could be
         // bound to (Task 9's per-class CI binding covers hosts, services,
-        // processes, k8s workloads, and more). Tune the metric selector to the
-        // entity classes this instance actually alerts on once real DQL access
-        // is available to iterate against (docs/USER-SETUP.md steps 1-3).
+        // processes, k8s workloads, and more). Extend byEntityKey above for
+        // any other class this instance alerts on once real DQL access is
+        // available to iterate against (docs/USER-SETUP.md steps 1-3).
         //
         // Input/output keys (connectionalias, timeframestart, timeframeend,
         // query, segmentid, requesttoken) are each action's
@@ -94,11 +130,13 @@ export const dtFetchMetricsSubflow = Subflow(
                 // ingestion workflow derives dt_entity_id from) replaces it
                 // here too; (2) a CAN_BE_SIMPLIFIED warning on `to:+15m` --
                 // the leading `+` is redundant, corrected to `to:15m`. The
-                // hardcoded `dt.host.cpu.usage` metric itself is unchanged and
-                // still just a representative default (see note above).
+                // metric name is now the per-class metricName flow variable
+                // (I5 fix) rather than a single hardcoded metric -- see note
+                // above.
                 query: wfa.inlineScript(`
                     var entityId = ${wfa.dataPill(params.flowVariables.entityId, 'string')} || '';
-                    return 'timeseries avg(dt.host.cpu.usage), filter: matchesValue(dt.smartscape_source.id, "' + entityId + '"), from:-15m, to:15m';
+                    var metricName = ${wfa.dataPill(params.flowVariables.metricName, 'string')} || 'dt.host.cpu.usage';
+                    return 'timeseries avg(' + metricName + '), filter: matchesValue(dt.smartscape_source.id, "' + entityId + '"), from:-15m, to:15m';
                 `),
                 segmentid: '',
             }
