@@ -1,5 +1,5 @@
 id: 7c35a230-d8bf-4379-8137-43b8ad000f3d
-title: Dynatrace Problems to ServiceNow ITOM (AIOps) v2
+title: Dynatrace to ServiceNow ITOM (AIOps)
 isDeployed: true
 description: Forwards Davis problems to ServiceNow ITOM Event Management as em_event records. ServiceNow performs dedup, reopen and close natively using message_key, so a single task covers the entire problem lifecycle.
 actor: 1910bc7a-1e77-420e-b669-3ffba145e214
@@ -66,7 +66,7 @@ tasks:
         | fieldsAdd dt_entity_name = coalesce(getNodeName(dt.smartscape_source.id), arrayFirst(affected_entity_names))
         | fieldsAdd dt_problem_display_id = "{{ event()['display_id'] }}"
         | fieldsAdd dt_problem_url = concat("https://bwm98081.apps.dynatrace.com/ui/apps/dynatrace.davis.problems/problem/", "{{ event()['event.id'] }}")
-        | lookup [load "/lookups/dt_to_snow_cmdb_mapping_v4"],
+        | lookup [load "/lookups/dt_to_snow_cmdb_mapping_v5"],
             sourceField: dt_entity_key, lookupField: dt_entity_key,
             fields: {now_ci_class, bind_strategy, sgc_managed}
         | lookup [ smartscapeEdges "runs_on", from:-24h

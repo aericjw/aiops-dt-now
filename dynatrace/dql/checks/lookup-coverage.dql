@@ -1,21 +1,26 @@
 // Coverage check: for every distinct dt_entity_key observed on live Davis
-// events in the window, confirm the v4 mapping table (the current
+// events in the window, confirm the v5 mapping table (the current
 // live/authoritative one -- see scripts/upload-lookup.sh for why this
-// instance has four lookup tables, v1 through v4, and why the load path
+// instance has five lookup tables, v1 through v5, and why the load path
 // here must always match extract_events.dql's) resolves now_ci_class
 // and bind_strategy. Any row with a null in either column means the lookup
 // table is missing that entity key and extract_events.dql will ship a null
 // bind for it.
 //
-// I2 fix (final whole-branch review, 2026-09-08): this was still pointed at
-// _v2 while extract_events.dql and the deployed workflow had already moved
-// on to _v4 -- this check was silently validating a stale, unused table.
+// v5 (2026-09-09): added 73 entity types sourced from installed Dynatrace
+// extensions' smartscapeNodeExtraction processors (see
+// ground-truth/dt-extension-entity-types.csv and
+// scripts/sweep-extension-entity-types.py). This is an open-ended
+// vocabulary, unlike classic Smartscape or built-in Grail node types --
+// re-run the sweep periodically as new extensions are installed, and
+// re-check this coverage query against live traffic to catch newly-visible
+// entity types this table doesn't have a row for yet.
 fetch dt.davis.events, from:-24h
 | fieldsAdd raw = arrayFirst(coalesce(smartscape.affected_entity.types, affected_entity_types))
 | fieldsAdd dt_entity_key = if(isNull(raw), "__unknown__",
     else: lower(if(startsWith(raw, "dt.entity."), substring(raw, from: 10), else: raw)))
 | summarize events = count(), by: {dt_entity_key}
-| lookup [load "/lookups/dt_to_snow_cmdb_mapping_v4"],
+| lookup [load "/lookups/dt_to_snow_cmdb_mapping_v5"],
     sourceField: dt_entity_key, lookupField: dt_entity_key,
     fields: {now_ci_class, bind_strategy}
 | filter isNull(now_ci_class) or isNull(bind_strategy)

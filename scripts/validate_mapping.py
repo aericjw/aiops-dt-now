@@ -63,7 +63,8 @@ def main(argv):
     if len(argv) < 2:
         print("usage: validate_mapping.py <mapping.csv> "
               "[dt-entity-keys.csv] [snow-ci-classes.csv] "
-              "[dt-smartscape-types.csv]", file=sys.stderr)
+              "[dt-smartscape-types.csv] [dt-extension-entity-types.csv]",
+              file=sys.stderr)
         return 2
 
     mapping_path = pathlib.Path(argv[1])
@@ -73,6 +74,13 @@ def main(argv):
                                 else "ground-truth/snow-ci-classes.csv")
     smartscape_path = pathlib.Path(argv[4] if len(argv) > 4
                                    else "ground-truth/dt-smartscape-types.csv")
+    # Third topology vocabulary: entity types created by installed Extensions
+    # 2.0 packages via smartscapeNodeExtraction processors (open-ended per
+    # tenant, unlike the two closed vocabularies above -- see
+    # docs/PIPELINE-FLOW.md and scripts/sweep-extension-entity-types.py for
+    # how this file is regenerated as new extensions are installed).
+    extension_path = pathlib.Path(argv[5] if len(argv) > 5
+                                  else "ground-truth/dt-extension-entity-types.csv")
 
     with open(mapping_path, newline="", encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
@@ -89,6 +97,7 @@ def main(argv):
     # sum, because a handful of keys (host, service, disk, ...) exist in both.
     valid_keys = (_load_column(keys_path, "dt_entity_key")
                   | _load_column(smartscape_path, "dt_entity_key")
+                  | _load_column(extension_path, "dt_entity_key")
                   | {"__unknown__"})
     valid_classes = _load_column(classes_path, "class_name")
 

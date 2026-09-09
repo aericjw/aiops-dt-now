@@ -89,7 +89,8 @@ def test_cli_valid_mapping_exits_zero():
          str(fixtures_dir() / "mapping-valid.csv"),
          str(fixtures_dir() / "ground-truth-keys.csv"),
          str(fixtures_dir() / "ground-truth-classes.csv"),
-         str(fixtures_dir() / "ground-truth-smartscape.csv")],
+         str(fixtures_dir() / "ground-truth-smartscape.csv"),
+         str(fixtures_dir() / "ground-truth-extension-empty.csv")],
         cwd=str(REPO_ROOT),
         capture_output=True, text=True
     )
@@ -104,7 +105,8 @@ def test_cli_nonexistent_class_exits_one():
          str(fixtures_dir() / "mapping-bad-class.csv"),
          str(fixtures_dir() / "ground-truth-keys.csv"),
          str(fixtures_dir() / "ground-truth-classes.csv"),
-         str(fixtures_dir() / "ground-truth-smartscape.csv")],
+         str(fixtures_dir() / "ground-truth-smartscape.csv"),
+         str(fixtures_dir() / "ground-truth-extension-empty.csv")],
         cwd=str(REPO_ROOT),
         capture_output=True, text=True
     )
@@ -120,7 +122,8 @@ def test_cli_missing_columns_exits_one_and_reports():
          str(fixtures_dir() / "mapping-missing-columns.csv"),
          str(fixtures_dir() / "ground-truth-keys.csv"),
          str(fixtures_dir() / "ground-truth-classes.csv"),
-         str(fixtures_dir() / "ground-truth-smartscape.csv")],
+         str(fixtures_dir() / "ground-truth-smartscape.csv"),
+         str(fixtures_dir() / "ground-truth-extension-empty.csv")],
         cwd=str(REPO_ROOT),
         capture_output=True, text=True
     )
@@ -141,7 +144,8 @@ def test_cli_unknown_sentinel_is_added_by_main():
          str(fixtures_dir() / "mapping-valid.csv"),
          str(fixtures_dir() / "ground-truth-keys.csv"),
          str(fixtures_dir() / "ground-truth-classes.csv"),
-         str(fixtures_dir() / "ground-truth-smartscape.csv")],
+         str(fixtures_dir() / "ground-truth-smartscape.csv"),
+         str(fixtures_dir() / "ground-truth-extension-empty.csv")],
         cwd=str(REPO_ROOT),
         capture_output=True, text=True
     )
@@ -159,7 +163,8 @@ def test_cli_smartscape_keys_are_included_in_valid_set():
          str(fixtures_dir() / "mapping-with-smartscape-key.csv"),
          str(fixtures_dir() / "ground-truth-keys.csv"),
          str(fixtures_dir() / "ground-truth-classes.csv"),
-         str(fixtures_dir() / "ground-truth-smartscape-sample.csv")],
+         str(fixtures_dir() / "ground-truth-smartscape-sample.csv"),
+         str(fixtures_dir() / "ground-truth-extension-empty.csv")],
         cwd=str(REPO_ROOT),
         capture_output=True, text=True
     )

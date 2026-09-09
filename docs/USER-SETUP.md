@@ -92,14 +92,65 @@ earlier draft of `docs/execution/RESUME.md`).
   filter?") is resolved -- `dynatrace/dql/extract_events.dql` has no
   `k8s.cluster.name` filter; the decision made was tenant-wide, not narrowed
   to a single cluster. This is final, not a pending decision.
-- **Four Dynatrace lookup tables**: `dt_to_snow_cmdb_mapping`, `_v2`, `_v3`,
-  `_v4` all exist on tacocorp. Only **`_v4`** is authoritative -- it's the
-  one `extract_events.dql` and `lookup-coverage.dql` actually load. The
-  other three are undeletable leftovers (the auth token lacks
-  `storage:files:delete`) and can be ignored. If you publish a new mapping
-  version, update BOTH `scripts/upload-lookup.sh`'s default path AND
-  `extract_events.dql`'s load path together in the same change -- these two
-  drifted apart once already (fixed in this review) and must not again.
+- **Five Dynatrace lookup tables**: `dt_to_snow_cmdb_mapping`, `_v2`, `_v3`,
+  `_v4`, `_v5` all exist on tacocorp. Only **`_v5`** is authoritative -- it's
+  the one `extract_events.dql`, `lookup-coverage.dql`, and the deployed
+  workflow actually load. The other four are undeletable leftovers (the auth
+  token lacks `storage:files:delete`) and can be ignored.
+
+## Keeping the lookup table current (this is an ongoing process, not one-time)
+
+`mapping/dt_to_snow_cmdb_mapping.csv` covers three separate entity-type
+vocabularies, ground-truthed from three sources:
+
+1. **Classic Smartscape** (`ground-truth/dt-entity-keys.csv`, 533 keys) --
+   Dynatrace's original, closed entity-type API.
+2. **Built-in Smartscape-on-Grail** (`ground-truth/dt-smartscape-types.csv`,
+   23 keys) -- Dynatrace's own native Grail topology node types (k8s_pod,
+   host, process, etc.), discovered mid-build as a *separate* vocabulary
+   from classic (see the T4-F-GRAIL ruling in the execution ledger).
+3. **Extension-defined entity types** (`ground-truth/dt-extension-entity-types.csv`,
+   73 keys as of 2026-09-09) -- entity types created by installed Extensions
+   2.0 packages via OpenPipeline `smartscapeNodeExtraction`/
+   `smartscapeEdgeExtraction` processors. **This one is open-ended, unlike
+   the first two** -- a new extension, or a new version of an existing one,
+   can define a type this table has never seen. It cannot be ground-truthed
+   once and forgotten.
+
+**When to re-run this process**: whenever a new extension is installed on
+the tenant, or periodically as a health check (e.g. quarterly).
+
+1. `python3 scripts/sweep-extension-entity-types.py` -- queries every
+   installed extension (`dtctl get extensions`) and pulls each one's
+   `smartscapeNode` definitions (`dtctl describe extension <name> --assets
+   smartscape`), writing results to `/tmp/extension-node-types-raw.tsv`.
+2. Diff the node types found against `ground-truth/dt-extension-entity-types.csv`'s
+   existing `smartscape_type` column (case-insensitively against
+   `dt_entity_key` in all three ground-truth files, since a type can already
+   be covered by classic or built-in Grail under a different literal string
+   -- see the merge logic used when this file was first built).
+3. For each genuinely new type, add a row to
+   `ground-truth/dt-extension-entity-types.csv` and a matching row to
+   `mapping/dt_to_snow_cmdb_mapping.csv`. Pick `now_ci_class` by checking
+   `ground-truth/snow-ci-classes.csv` for a real match (never invent a class
+   name); fall back to `cmdb_ci_appl` or generic `cmdb_ci` per spec section
+   7.2's tier-3 rule when nothing specific exists. `bind_strategy` should be
+   `ire_correlated` unless the new type has a deterministic, SGC-verified
+   name-composition rule the way host/service/process do (unlikely for a
+   third-party extension's custom entities).
+4. `python3 scripts/validate_mapping.py mapping/dt_to_snow_cmdb_mapping.csv`
+   must pass (exit 0) before publishing.
+5. `bash scripts/upload-lookup.sh` (creates the next version, e.g. `_v6`) --
+   then update `dynatrace/dql/extract_events.dql`, `dynatrace/dql/checks/lookup-coverage.dql`,
+   AND the script's own default path, all in the same change (they drifted
+   apart once already, see the I2 finding below), and `dtctl apply` the
+   workflow YAML so the live deployed workflow actually picks up the new
+   path (a `dtctl apply` also re-syncs the workflow's `title` field from
+   this repo's YAML -- if the title was ever renamed live in the Dynatrace
+   UI, sync that rename into the YAML *before* running apply, or the apply
+   will silently revert it, which happened once during this exact process).
+6. Re-run `dynatrace/dql/checks/lookup-coverage.dql` against live traffic to
+   confirm zero coverage gaps.
 - **~48 synthetic CMDB CI records**: Task 9b backfilled these on the
   ServiceNow PDI, tagged `discovery_source=SIM-Dynatrace-Test`. They are
   confirmed non-deletable and non-renamable via any write path available in
