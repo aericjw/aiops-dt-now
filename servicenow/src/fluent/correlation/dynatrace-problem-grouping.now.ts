@@ -67,13 +67,45 @@ import { Record } from '@servicenow/sdk/core'
 // its own worked example, but the field itself is never optional in any sample
 // seen), so SECONDARY is kept present and typed as an array even when empty rather
 // than omitted, to match that shape rather than guess at an undocumented
-// omitted-key behavior). This applies regardless of current.isRootCause: a
-// genuinely solo alert has no better primary candidate than itself either way. The
-// pre-existing "demote to the real root-cause alert when it later arrives" logic
-// (the `current.isRootCause` branch, which re-parents ALL of `others`) already
-// covers the case where a second, root-cause alert for the same problem arrives
-// after this one: by then `others.length` is 1 (this alert), so that branch fires
-// as before -- no change was needed there.
+// omitted-key behavior).
+//
+// --- C1/C2 fix, 2026-09-08 (final whole-branch review) --------------------
+// C1: the regex escaping above was broken -- inside this backtick template
+// literal, `\s` (single backslash) is a JS "NonEscapeCharacter" sequence that
+// collapses to a literal `s`, NOT a `\s` whitespace token, in the deployed
+// script content. Confirmed empirically by reading the live deployed
+// em_alert_correlation_rule.script field, which showed `[{,]s*` -- unable to
+// match the real `, ` (comma-space) separator in additional_content, so
+// extractProblemAndRootCause() always returned null and grouping never
+// worked at all, regardless of the others.length fix above. Fixed by writing
+// `\\s` in this source (so the template literal's escape processing produces
+// `\s` in the deployed string). `\\.` was already correct for the same
+// reason (a template literal `\\` collapses to a single literal `\`, which
+// is what a regex literal dot-escape needs).
+//
+// C2: once C1 made grouping actually work, the `others.length === 0` branch
+// above (as originally written) was unconditional -- it made ANY solo alert
+// PRIMARY regardless of current.isRootCause. For a multi-alert Davis
+// problem where a non-root-cause alert happens to arrive first,
+// others.length===0 at that point too, so it would wrongly become PRIMARY
+// and immediately match the incident-promotion filter (task 11:
+// source=Dynatrace^correlation_rule_group=1^incidentISEMPTY), creating an
+// incident from the wrong alert. When the true root-cause alert then
+// arrived, it would correctly re-parent the first alert to SECONDARY and
+// become PRIMARY itself -- but by then IT has incidentISEMPTY=true, so it
+// ALSO matches the promotion filter: two incidents per problem, one from
+// the wrong alert. Fixed by gating the solo branch on current.isRootCause;
+// a solo non-root-cause alert now returns {} (stays ungrouped) instead of
+// self-promoting, and is picked up as SECONDARY later if/when a root-cause
+// sibling arrives (see the isRootCause branch below, which re-parents all
+// of `others`, including this alert once it's been seen by a later query).
+//
+// All four cases after this fix:
+//   solo + root-cause       -> PRIMARY = self, SECONDARY = []
+//   solo + not-root-cause   -> {} (wait; do not self-promote)
+//   multi + root-cause      -> PRIMARY = self, SECONDARY = others (re-parents)
+//   multi + not-root-cause  -> PRIMARY = existing root-cause other, or
+//                              earliest-arrived other as fallback; SECONDARY = [self]
 Record({
     $id: Now.ID['dt-correlate-by-problem'],
     table: 'em_alert_correlation_rule',
@@ -108,11 +140,11 @@ Record({
         // Anchored to a key boundary (start of string, "{", or ", ") so a
         // hypothetical future key merely ending in the same suffix (e.g.
         // "some_other_dt_problem_display_id") can't false-match.
-        var problemMatch = content.match(/(?:^|[{,]\s*)dt_problem_display_id=(P-[0-9]+)/);
+        var problemMatch = content.match(/(?:^|[{,]\\s*)dt_problem_display_id=(P-[0-9]+)/);
         if (!problemMatch) {
             return null;
         }
-        var rootCauseMatch = content.match(/(?:^|[{,]\s*)dt\\.davis\\.is_rootcause_relevant=(true|false)/);
+        var rootCauseMatch = content.match(/(?:^|[{,]\\s*)dt\\.davis\\.is_rootcause_relevant=(true|false)/);
         return {
             problemId: problemMatch[1],
             isRootCause: rootCauseMatch ? (rootCauseMatch[1] === 'true') : false,
@@ -155,19 +187,34 @@ Record({
     }
 
     var result = {};
-    if (others.length === 0) {
+    if (others.length === 0 && current.isRootCause) {
         // No other still-groupable alert has been seen yet for this Davis
-        // problem: currentAlert is primary of a group containing only
-        // itself -- root-cause or not, there is no better candidate than
-        // itself when it's the only alert. If a genuine root-cause alert
-        // for this problem arrives later (while this one is still
-        // "current"), the isRootCause branch below re-parents everything in
-        // others -- which will by then include this alert -- so this
-        // provisional self-primary gets correctly demoted at that point.
+        // problem, AND currentAlert is itself the root-cause event: it is
+        // primary of a group containing only itself. This is the common
+        // case for a single-alert Davis problem (Davis marks the sole
+        // contributing event as root cause when there's only one).
         result = {
             'PRIMARY': [currentAlert.getValue('sys_id')],
             'SECONDARY': [],
         };
+    } else if (others.length === 0 && !current.isRootCause) {
+        // No other still-groupable alert has been seen yet, and currentAlert
+        // is NOT the root cause. Do NOT make it primary: gating this on
+        // current.isRootCause (fix for C2, 2026-09-08) prevents a
+        // non-root-cause alert that happens to arrive first from becoming
+        // PRIMARY and immediately matching the incident-promotion filter
+        // (source=Dynatrace^correlation_rule_group=1^incidentISEMPTY) --
+        // which would create an incident from the wrong alert, and then a
+        // SECOND incident when the true root-cause alert arrives later and
+        // re-parents this one to SECONDARY (at which point the new PRIMARY
+        // again has incidentISEMPTY=true). Instead, leave this alert
+        // ungrouped (correlation_rule_group stays 0/None): either a
+        // root-cause sibling arrives later and the isRootCause branch below
+        // re-parents it (this alert is included in that sibling's others
+        // query, since correlation_rule_group=0 still matches 'IN','0,1'),
+        // or no sibling ever arrives and it simply never groups -- both
+        // outcomes are safer than a premature, possibly-wrong incident.
+        return JSON.stringify({});
     } else if (current.isRootCause) {
         // currentAlert is the Davis root-cause event: it is primary over
         // every other alert already seen for this problem, even ones

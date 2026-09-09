@@ -75,6 +75,8 @@ def test_bind_strategy_enum_matches_spec():
 import subprocess
 import tempfile
 
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+
 
 def fixtures_dir():
     return pathlib.Path(__file__).resolve().parent / "fixtures"
@@ -88,7 +90,7 @@ def test_cli_valid_mapping_exits_zero():
          str(fixtures_dir() / "ground-truth-keys.csv"),
          str(fixtures_dir() / "ground-truth-classes.csv"),
          str(fixtures_dir() / "ground-truth-smartscape.csv")],
-        cwd="/Users/aeric/Projects/aiops-dt-now",
+        cwd=str(REPO_ROOT),
         capture_output=True, text=True
     )
     assert result.returncode == 0, f"Expected exit 0, got {result.returncode}. stderr: {result.stderr}"
@@ -103,7 +105,7 @@ def test_cli_nonexistent_class_exits_one():
          str(fixtures_dir() / "ground-truth-keys.csv"),
          str(fixtures_dir() / "ground-truth-classes.csv"),
          str(fixtures_dir() / "ground-truth-smartscape.csv")],
-        cwd="/Users/aeric/Projects/aiops-dt-now",
+        cwd=str(REPO_ROOT),
         capture_output=True, text=True
     )
     assert result.returncode == 1, f"Expected exit 1, got {result.returncode}"
@@ -119,7 +121,7 @@ def test_cli_missing_columns_exits_one_and_reports():
          str(fixtures_dir() / "ground-truth-keys.csv"),
          str(fixtures_dir() / "ground-truth-classes.csv"),
          str(fixtures_dir() / "ground-truth-smartscape.csv")],
-        cwd="/Users/aeric/Projects/aiops-dt-now",
+        cwd=str(REPO_ROOT),
         capture_output=True, text=True
     )
     assert result.returncode == 1, f"Expected exit 1, got {result.returncode}"
@@ -140,7 +142,7 @@ def test_cli_unknown_sentinel_is_added_by_main():
          str(fixtures_dir() / "ground-truth-keys.csv"),
          str(fixtures_dir() / "ground-truth-classes.csv"),
          str(fixtures_dir() / "ground-truth-smartscape.csv")],
-        cwd="/Users/aeric/Projects/aiops-dt-now",
+        cwd=str(REPO_ROOT),
         capture_output=True, text=True
     )
     assert result.returncode == 0, f"Expected exit 0, got {result.returncode}. stderr: {result.stderr}"
@@ -158,7 +160,7 @@ def test_cli_smartscape_keys_are_included_in_valid_set():
          str(fixtures_dir() / "ground-truth-keys.csv"),
          str(fixtures_dir() / "ground-truth-classes.csv"),
          str(fixtures_dir() / "ground-truth-smartscape-sample.csv")],
-        cwd="/Users/aeric/Projects/aiops-dt-now",
+        cwd=str(REPO_ROOT),
         capture_output=True, text=True
     )
     assert result.returncode == 0, f"Expected exit 0, got {result.returncode}. stderr: {result.stderr}"
