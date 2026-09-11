@@ -62,8 +62,8 @@ Record({
     $id: Now.ID['dt-incident-template'],
     table: 'em_incident_template',
     data: {
-        name: 'Dynatrace - Incident Template for Event Management',
-        short_description: 'Create incident from Dynatrace Davis root cause alert',
+        name: 'Incident Template for Event Management (multi-source)',
+        short_description: 'Create incident from an aggregation group\'s primary alert, any source',
         table: 'incident',
         active: true,
         template: 'state=2^active=true^EQ',
@@ -78,17 +78,15 @@ Record({
 // a different field/table with a different encoding).
 //
 // Condition breakdown:
-//   - source=Dynatrace: scope to this pipeline's alerts only.
 //   - correlation_rule_group=1: "Primary" (verified against sys_choice for
-//     em_alert.correlation_rule_group) -- the role task-10's advanced
-//     correlation rule assigns to the alert carrying
-//     dt.davis.is_rootcause_relevant=true. This is deliberately
-//     correlation_rule_group (Role in User Defined Group), not
-//     correlation_group (Role in Group, the OOB ML/Alert-Groups engine that
-//     the "Create Incident on Primary Critical Alert" sample rule targets
-//     and that this pipeline does not use) -- using the wrong one would
-//     silently never fire, since our alerts are only ever grouped via the
-//     em_alert_correlation_rule from task-10.
+//     em_alert.correlation_rule_group) -- the role
+//     dynatrace-problem-grouping.now.ts's advanced correlation rule assigns.
+//     This is deliberately correlation_rule_group (Role in User Defined
+//     Group), not correlation_group (Role in Group, the OOB ML/Alert-Groups
+//     engine that the "Create Incident on Primary Critical Alert" sample
+//     rule targets and that this pipeline does not use) -- using the wrong
+//     one would silently never fire, since our alerts are only ever grouped
+//     via the em_alert_correlation_rule from task-10.
 //   - incidentISEMPTY: without this, an alert already promoted to an
 //     incident would re-fire this rule on every subsequent update the same
 //     way an unguarded rule would, which is the exact "one incident per
@@ -106,17 +104,34 @@ Record({
 // rules") also matches the prevailing convention among active rules, so this
 // rule does not block any other, unrelated alert_management_rule from also
 // evaluating the same alert.
+//
+// --- Generalized 2026-09-11 (dropped source=Dynatrace): -------------------
+// dynatrace-problem-grouping.now.ts's correlation rule now groups by bound
+// CI across sources, not just Dynatrace's. Leaving this rule scoped to
+// source=Dynatrace would have meant a different source's alert could become
+// a correlation group's primary but still never get promoted to an incident
+// -- the exact same kind of half-generalization that would have made the
+// correlation and sweep-job changes pointless for anyone but Dynatrace.
+// Checked for collisions before widening: every other active,
+// automatically-executing em_alert_management_rule on this instance either
+// targets a different source explicitly (PRTG, Instana, Honeycomb, Oracle
+// EM, OMi, Google Monitor, New Relic, Lightstep, EMSelfMonitoring, SGO-
+// Dynatrace) or -- the one broad-looking exception, "Create Incident
+// Manually" (alert_filter maintenance=false^incidentISEMPTY, order 100) --
+// has its own action set to Manual execution (a person has to click it), so
+// it never auto-creates an incident regardless of how broad its filter is.
+// Nothing else on this instance can silently double-promote the same alert.
 Record({
     $id: Now.ID['dt-promote-primary-to-incident'],
     table: 'em_alert_management_rule',
     data: {
-        name: 'Dynatrace - create incident from Davis root cause alert',
+        name: 'Create incident from aggregation group primary alert (multi-source)',
         active: true,
         order: 8010,
         type: 'incident',
         automatic_execution_setting: 1,
         multiple_alert_rules: 1,
-        alert_filter: 'source=Dynatrace^correlation_rule_group=1^incidentISEMPTY',
+        alert_filter: 'correlation_rule_group=1^incidentISEMPTY',
         // Now.ID['dt-incident-template'] (used elsewhere only as a $id) resolves to the raw
         // key string, not the referenced record's sys_id, when used as a data field value --
         // confirmed by a first deploy attempt that landed the literal string
@@ -126,7 +141,7 @@ Record({
         // to a sys_id at build time -- that is the correct call here.
         incident_template: Now.ref('em_incident_template', 'dt-incident-template'),
         description:
-            'Creates one incident per Dynatrace Davis problem, from the root cause alert only (correlation_rule_group=1, set by the task-10 em_alert_correlation_rule on the alert whose event carried dt.davis.is_rootcause_relevant=true). Supporting alerts in the group never carry that role and so never create their own incidents.',
+            'Creates one incident per aggregation group, from the primary alert only (correlation_rule_group=1, set by dynatrace-problem-grouping.now.ts\'s correlation rule). Source-agnostic: any alert that reaches Primary status, regardless of which integration created it, is promoted the same way. Supporting alerts never carry that role and so never create their own incidents.',
     },
 })
 
