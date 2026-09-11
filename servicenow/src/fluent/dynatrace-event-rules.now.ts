@@ -200,14 +200,26 @@ Record({
 // the last rule in the band (order 8090) and only ever sees events the three
 // rules above did not already claim.
 //
-// KNOWN LIMITATION (fix round 2 finding, out of scope to fix): correlation_id
-// is empty on every SGC-created CI in this CMDB. Any Dynatrace entity type
-// whose target CMDB class is SGC-managed but mapped to ire_correlated (rather
-// than one of the three named-match strategies above) can never bind via this
-// rule, because the identification attribute it matches on is always empty on
-// the CI side. Writing correlation_id into CMDB was explicitly out of scope
-// for this task. ire_correlated bind rates should be read as a floor, not a
-// true measure of CMDB coverage, until that gap is addressed elsewhere.
+// FIX (2026-09-11, live demonstration case): correlation_id is empty on
+// every SGC-created CI in this CMDB (confirmed defect D3) -- a single-attribute
+// rule that only tries correlation_id can never bind any of the ~550
+// ire_correlated-mapped entity types, no matter how good CMDB coverage gets.
+// Confirmed live with 8 real, currently-unbound "frontend" alerts
+// (node="easytrade", dt_entity_key=frontend, spanning 2026-09-07 through
+// 2026-09-11) sitting right next to an exact-name-matching backfilled CI
+// (cmdb_ci_web_application "easytrade", from Task 9b) that this rule could
+// never have found, because it never attempts a name match at all.
+//
+// Fix: add a second identification_rules entry -- IRE tries each entry in
+// order until one identifies a CI, same mechanism the three named rules
+// above already rely on (each of those is a single-entry, name-only rule).
+// This one now tries correlation_id first (works if a future integration
+// ever populates it), then falls back to matching `node` against the CI's
+// `name` -- the same attribute/ruleName shape proven working by the host/
+// service/process rules, applied here against the base `cmdb_ci` type so it
+// can match a CI in any subclass (cmdb_ci_web_application,
+// cmdb_ci_kubernetes_pod, etc.), since ServiceNow table extension means a
+// query against the base table reaches every subclass.
 Record({
     $id: Now.ID['dt-bind-ire-correlated'],
     table: 'em_match_rule',
@@ -243,6 +255,12 @@ Record({
                 ciType: 'cmdb_ci',
                 attributes: [
                     { attribute: 'correlation_id', ciType: 'cmdb_ci', ruleName: 'correlation_id', value: 'dt_entity_id' },
+                ],
+            },
+            {
+                ciType: 'cmdb_ci',
+                attributes: [
+                    { attribute: 'name', ciType: 'cmdb_ci', ruleName: 'name', value: 'node' },
                 ],
             },
         ]),
