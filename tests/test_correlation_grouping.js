@@ -10,6 +10,16 @@
 //   3. C1 (this review): \s inside the backtick template literal collapses
 //      to a literal "s" at parse time, silently breaking both regexes
 //
+// Updated 2026-09-11 for the CI-based generalization: the script no longer
+// groups by dt_problem_display_id (Dynatrace-only data) -- it groups by
+// `cmdb_ci` (a real column, any source), ranking candidates by an optional
+// Davis root-cause flag first, then by severity (normalizing severity=0
+// Clear/resolved to the worst rank so it can never outrank an active alert).
+// Cases below cover: solo self-promotion, cross-CI isolation (the whole
+// point of the generalization), root-cause outranking severity, and
+// severity-only ranking when neither alert has a root-cause signal (the new
+// behavior a Dynatrace-only test suite would never have exercised).
+//
 // How this test works: it does NOT re-implement or hand-copy the script's
 // logic. It extracts the literal `script: `...`` template-literal text
 // straight out of the .now.ts SOURCE FILE and hands it to Node's own parser
@@ -17,9 +27,8 @@
 // the same JS/TS grammar the real @servicenow/sdk build uses -- so template
 // literal escape collapsing (the exact class of bug in C1) is reproduced
 // faithfully rather than re-guessed. The resulting function is then run
-// against stub GlideRecord/GlideDateTime objects seeded with a real captured
-// payload shape (see FIXTURE_PROBLEM_ID below, from the reviewer's live
-// P-26091518 example) and checked against the four PRIMARY/SECONDARY cases.
+// against stub GlideRecord/GlideDateTime objects seeded with realistic
+// payload shapes and checked against the PRIMARY/SECONDARY cases below.
 //
 // Run directly: node tests/test_correlation_grouping.js
 // Or via pytest: tests/test_correlation_grouping.py (subprocess wrapper,
@@ -173,12 +182,17 @@ function runScript(deployedScriptText, currentAlertRecord, database) {
     return JSON.parse(resultJson);
 }
 
-// ---- Fixture data, from the reviewer's live captured payload shape --------
-// (real example: {event.id=..., dt_problem_display_id=P-26091518,
-//  dt.davis.is_rootcause_relevant=true})
+// ---- Fixture data -----------------------------------------------------
+// additional_info shape matches live captured payloads: a Java
+// Map#toString-rendered `additional_content` string. isRootCause is
+// optional (undefined => the key is omitted entirely, simulating a
+// non-Dynatrace source that never carries this field at all).
 
-function additionalInfo(problemId, isRootCause, eventId) {
-    const content = `event.id=${eventId}, dt_problem_display_id=${problemId}, dt.davis.is_rootcause_relevant=${isRootCause}`;
+function additionalInfo(isRootCause, eventId) {
+    let content = `event.id=${eventId}`;
+    if (isRootCause !== undefined) {
+        content += `, dt.davis.is_rootcause_relevant=${isRootCause}`;
+    }
     return JSON.stringify({ additional_content: content });
 }
 
@@ -207,51 +221,85 @@ function main() {
 
     // Case 1: solo + root-cause -> PRIMARY = self, SECONDARY = []
     {
-        const current = { sys_id: 'alert-1', additional_info: additionalInfo('P-26091518', true, 'evt-1'), initial_remote_time: '2026-09-08 10:00:00' };
+        const current = { sys_id: 'alert-1', cmdb_ci: 'ci-A', additional_info: additionalInfo(true, 'evt-1'), initial_remote_time: '2026-09-08 10:00:00', severity: '3' };
         const database = [];
         const result = runScript(deployedScriptText, current, database);
         assertDeepEqual(result, { PRIMARY: ['alert-1'], SECONDARY: [] }, 'solo + root-cause');
     }
 
-    // Case 2: solo + not-root-cause -> {} (must NOT self-promote; this is the C2 fix)
+    // Case 2: solo + no root-cause signal -> {} (must NOT self-promote; C2 fix, generalized)
     {
-        const current = { sys_id: 'alert-2', additional_info: additionalInfo('P-26091519', false, 'evt-2'), initial_remote_time: '2026-09-08 10:00:00' };
+        const current = { sys_id: 'alert-2', cmdb_ci: 'ci-A', additional_info: additionalInfo(undefined, 'evt-2'), initial_remote_time: '2026-09-08 10:00:00', severity: '2' };
         const database = [];
         const result = runScript(deployedScriptText, current, database);
-        assertDeepEqual(result, {}, 'solo + not-root-cause (C2 regression: must not self-promote)');
+        assertDeepEqual(result, {}, 'solo + no root-cause signal (C2 regression: must not self-promote)');
     }
 
-    // Case 3: multi + root-cause -> PRIMARY = self, SECONDARY = others (re-parents)
+    // Case 3: multi, current is root-cause -> PRIMARY = self, SECONDARY = others
+    // (re-parents), even though the other alert has a "worse" i.e. lower
+    // severity rank -- root-cause always outranks severity.
     {
-        const current = { sys_id: 'alert-3-rootcause', additional_info: additionalInfo('P-26091520', true, 'evt-3'), initial_remote_time: '2026-09-08 10:05:00' };
+        const current = { sys_id: 'alert-3-rootcause', cmdb_ci: 'ci-A', additional_info: additionalInfo(true, 'evt-3'), initial_remote_time: '2026-09-08 10:05:00', severity: '4' };
         const database = [
-            { sys_id: 'alert-3-other', additional_info: additionalInfo('P-26091520', false, 'evt-3b'), initial_remote_time: '2026-09-08 10:00:00', correlation_rule_group: '1' },
+            { sys_id: 'alert-3-other', cmdb_ci: 'ci-A', additional_info: additionalInfo(undefined, 'evt-3b'), initial_remote_time: '2026-09-08 10:00:00', correlation_rule_group: '1', severity: '1' },
         ];
         const result = runScript(deployedScriptText, current, database);
-        assertDeepEqual(result, { PRIMARY: ['alert-3-rootcause'], SECONDARY: ['alert-3-other'] }, 'multi + root-cause');
+        assertDeepEqual(result, { PRIMARY: ['alert-3-rootcause'], SECONDARY: ['alert-3-other'] }, 'multi + current is root-cause outranks severity');
     }
 
-    // Case 4a: multi + not-root-cause, existing root-cause other present ->
-    // PRIMARY = that existing root-cause alert, SECONDARY = [self]
+    // Case 4: multi, neither alert has a root-cause signal (e.g. both from a
+    // non-Dynatrace source) -> ranking falls through to severity alone. The
+    // existing other has the worse (lower) severity number, so it stays
+    // PRIMARY and currentAlert becomes SECONDARY.
     {
-        const current = { sys_id: 'alert-4a-supporting', additional_info: additionalInfo('P-26091521', false, 'evt-4a'), initial_remote_time: '2026-09-08 10:05:00' };
+        const current = { sys_id: 'alert-4-supporting', cmdb_ci: 'ci-A', additional_info: additionalInfo(undefined, 'evt-4'), initial_remote_time: '2026-09-08 10:05:00', severity: '3' };
         const database = [
-            { sys_id: 'alert-4a-rootcause', additional_info: additionalInfo('P-26091521', true, 'evt-4a-rc'), initial_remote_time: '2026-09-08 10:00:00', correlation_rule_group: '1' },
+            { sys_id: 'alert-4-worse', cmdb_ci: 'ci-A', additional_info: additionalInfo(undefined, 'evt-4-worse'), initial_remote_time: '2026-09-08 10:00:00', correlation_rule_group: '1', severity: '1' },
         ];
         const result = runScript(deployedScriptText, current, database);
-        assertDeepEqual(result, { PRIMARY: ['alert-4a-rootcause'], SECONDARY: ['alert-4a-supporting'] }, 'multi + not-root-cause (existing root-cause other)');
+        assertDeepEqual(result, { PRIMARY: ['alert-4-worse'], SECONDARY: ['alert-4-supporting'] }, 'multi + severity-only ranking, existing other stays primary');
     }
 
-    // Case 4b: multi + not-root-cause, NO root-cause other seen yet -> fallback
-    // to earliest-arrived other as provisional PRIMARY (will be re-parented
-    // later when the true root-cause alert arrives).
+    // Case 5: multi, neither alert has a root-cause signal, but currentAlert
+    // has the worse (lower) severity number than the existing primary ->
+    // currentAlert outranks it on severity alone and becomes the new
+    // PRIMARY, re-parenting the previous one. This is the behavior a
+    // Dynatrace-only test suite would never exercise, since it never had a
+    // non-root-cause severity comparison to make.
     {
-        const current = { sys_id: 'alert-4b-supporting-2', additional_info: additionalInfo('P-26091522', false, 'evt-4b'), initial_remote_time: '2026-09-08 10:10:00' };
+        const current = { sys_id: 'alert-5-worse', cmdb_ci: 'ci-A', additional_info: additionalInfo(undefined, 'evt-5'), initial_remote_time: '2026-09-08 10:10:00', severity: '1' };
         const database = [
-            { sys_id: 'alert-4b-supporting-1', additional_info: additionalInfo('P-26091522', false, 'evt-4b-early'), initial_remote_time: '2026-09-08 10:00:00', correlation_rule_group: '0' },
+            { sys_id: 'alert-5-other', cmdb_ci: 'ci-A', additional_info: additionalInfo(undefined, 'evt-5-other'), initial_remote_time: '2026-09-08 10:00:00', correlation_rule_group: '0', severity: '3' },
         ];
         const result = runScript(deployedScriptText, current, database);
-        assertDeepEqual(result, { PRIMARY: ['alert-4b-supporting-1'], SECONDARY: ['alert-4b-supporting-2'] }, 'multi + not-root-cause (fallback to earliest, no root-cause other yet)');
+        assertDeepEqual(result, { PRIMARY: ['alert-5-worse'], SECONDARY: ['alert-5-other'] }, 'multi + severity-only ranking, currentAlert outranks and re-parents');
+    }
+
+    // Case 6: severity=0 (Clear/resolved) must never outrank an active
+    // alert on the same CI, even though 0 < any positive severity number
+    // numerically -- this is exactly what severityRank()'s normalization to
+    // 999 exists to prevent.
+    {
+        const current = { sys_id: 'alert-6-clear', cmdb_ci: 'ci-A', additional_info: additionalInfo(undefined, 'evt-6'), initial_remote_time: '2026-09-08 10:10:00', severity: '0' };
+        const database = [
+            { sys_id: 'alert-6-active', cmdb_ci: 'ci-A', additional_info: additionalInfo(undefined, 'evt-6-active'), initial_remote_time: '2026-09-08 10:00:00', correlation_rule_group: '0', severity: '4' },
+        ];
+        const result = runScript(deployedScriptText, current, database);
+        assertDeepEqual(result, { PRIMARY: ['alert-6-active'], SECONDARY: ['alert-6-clear'] }, 'severity=0 (Clear) must not outrank an active alert');
+    }
+
+    // Case 7: cross-CI isolation -- the whole point of the generalization.
+    // An alert on a DIFFERENT cmdb_ci within the same time window must NOT
+    // be treated as "other": currentAlert has no root-cause signal and no
+    // other alert on ITS OWN CI, so it must stay ungrouped ({}), not get
+    // pulled into a group with an unrelated CI's alert.
+    {
+        const current = { sys_id: 'alert-7-ci-b', cmdb_ci: 'ci-B', additional_info: additionalInfo(undefined, 'evt-7'), initial_remote_time: '2026-09-08 10:05:00', severity: '2' };
+        const database = [
+            { sys_id: 'alert-7-ci-a', cmdb_ci: 'ci-A', additional_info: additionalInfo(undefined, 'evt-7-other-ci'), initial_remote_time: '2026-09-08 10:00:00', correlation_rule_group: '0', severity: '1' },
+        ];
+        const result = runScript(deployedScriptText, current, database);
+        assertDeepEqual(result, {}, 'cross-CI isolation: an alert on a different CI must not be grouped in');
     }
 
     console.log('ALL PASS');
