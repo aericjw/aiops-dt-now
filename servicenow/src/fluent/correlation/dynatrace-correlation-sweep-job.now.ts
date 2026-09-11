@@ -47,18 +47,33 @@ import { Record } from '@servicenow/sdk/core'
 //
 // This job is the workaround: run calculateAlertCorrelation() ourselves,
 // from a scheduled job's own thread (never the guarded event-processing
-// thread), for any Dynatrace alert the OOB rule's guard skipped. Confirmed
-// this is NOT redundant with the OOB rule: activating more of the
-// pre-existing "[Tag Based]" em_alert_correlation_rule rows would NOT help
-// either -- they live in the exact same em_alert_correlation_rule table,
-// invoked through the exact same guarded call site, so they hit the
-// identical gate (verified live: all 16 tag-based rows have
-// table: 'em_alert', same as this project's own rule).
+// thread), for any alert the OOB rule's guard skipped. Confirmed this is NOT
+// redundant with the OOB rule: activating more of the pre-existing
+// "[Tag Based]" em_alert_correlation_rule rows would NOT help either -- they
+// live in the exact same em_alert_correlation_rule table, invoked through
+// the exact same guarded call site, so they hit the identical gate (verified
+// live: all 16 tag-based rows have table: 'em_alert', same as this
+// project's own rule).
+//
+// Generalized 2026-09-11 (dropped the source=Dynatrace filter): the guard
+// this job works around is in ServiceNow's OWN platform code, applied
+// identically to every alert regardless of source -- it was never a
+// Dynatrace-specific gate, only ever tested against Dynatrace alerts
+// because that's all this pipeline produced at the time. Now that
+// dynatrace-problem-grouping.now.ts's correlation rule groups by bound CI
+// across sources, restricting this sweep to Dynatrace alone would silently
+// cap the generalization's effect: any other source's alert would still
+// never get calculateAlertCorrelation() invoked at all, since it hits the
+// exact same guard. Sweeping every source (including Azure Monitor, which
+// is excluded from OUR correlation rule's own grouping logic but is
+// equally blocked by this same platform gate for ITS OWN dedicated
+// correlation rule) lets every source benefit from this workaround, not
+// just the one this project happened to build first.
 Record({
     $id: Now.ID['dt-correlation-sweep-job'],
     table: 'sysauto_script',
     data: {
-        name: 'Dynatrace - sweep ungrouped alerts for correlation',
+        name: 'Sweep ungrouped alerts for correlation (multi-source)',
         active: true,
         run_type: 'periodically',
         run_period: '1970-01-01 00:01:00', // every 1 minute; matches this instance's own EM job cadence convention (e.g. "Event Management - close threshold alerts" runs every 2 minutes)
@@ -70,12 +85,13 @@ Record({
         // No `description` field exists on sysauto_script (Fluent SDK's own
         // type rejects it) -- the full rationale lives in this file's header
         // comment instead.
-        script: `(function sweepDynatraceAlertsForCorrelation() {
+        script: `(function sweepAlertsForCorrelation() {
     // Bounded: at most 200 alerts per run, oldest first, so a large backlog
     // (e.g. after this job was first deployed) doesn't create one
     // long-running execution -- it'll catch up over a few cycles instead.
+    // No source filter: the platform gate this job works around applies to
+    // every source identically (see header comment).
     var gr = new GlideRecord('em_alert');
-    gr.addQuery('source', 'Dynatrace');
     // 0=None, 1=Primary -- both are "still groupable"; re-invoking on an
     // existing Primary lets a later-arriving root-cause alert re-parent it,
     // same semantics the correlation script's own "others" query already
