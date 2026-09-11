@@ -315,9 +315,9 @@ cloud:gcp:tpu_worker,cmdb_ci_cloud_host,ire_correlated,false
 cloud:oci:compute,cmdb_ci_vm_instance,ire_correlated,false
 cloud:oci:instance_pool,cmdb_ci_cloud_resource_base,ire_correlated,false
 cloud:oci:tenant,cmdb_ci_cloud_org,ire_correlated,false
-cloud_application,cmdb_ci_appl,ire_correlated,false
-cloud_application_instance,cmdb_ci_appl,ire_correlated,false
-cloud_application_namespace,cmdb_ci_appl,ire_correlated,false
+cloud_application,cmdb_ci_kubernetes_deployment,ire_correlated,false
+cloud_application_instance,cmdb_ci_kubernetes_pod,ire_correlated,false
+cloud_application_namespace,cmdb_ci_kubernetes_namespace,ire_correlated,false
 cloudhub:api,cmdb_ci_appl,ire_correlated,false
 cloudhub:app,cmdb_ci_appl,ire_correlated,false
 cloudhub:env,cmdb_ci,ire_correlated,false

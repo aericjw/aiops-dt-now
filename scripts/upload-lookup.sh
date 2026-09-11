@@ -5,9 +5,9 @@
 # NOTE: This does not delete-then-create in place. The authenticated token lacks
 # the storage:files:delete scope required by `dtctl delete lookup`, so this script
 # creates at a new path instead of replacing the old one. Every prior path
-# (currently _v1 through _v4) is left untouched as a rollback artifact -- this
-# tacocorp instance now has FIVE lookup tables for this reason
-# (dt_to_snow_cmdb_mapping_v1 .. _v5), and _v5 is the current live/authoritative
+# (currently _v1 through _v5) is left untouched as a rollback artifact -- this
+# tacocorp instance now has SIX lookup tables for this reason
+# (dt_to_snow_cmdb_mapping_v1 .. _v6), and _v6 is the current live/authoritative
 # one (the one dynatrace/dql/extract_events.dql actually loads).
 #
 # I2 fix (final whole-branch review, 2026-09-08): this default had drifted to
@@ -29,7 +29,7 @@
 set -euo pipefail
 
 SRC="${1:-mapping/dt_to_snow_cmdb_mapping.csv}"
-LOOKUP_PATH="${2:-/lookups/dt_to_snow_cmdb_mapping_v5}"
+LOOKUP_PATH="${2:-/lookups/dt_to_snow_cmdb_mapping_v6}"
 EXPECTED_CONTEXT="${EXPECTED_CONTEXT:-tacocorp}"
 
 CONTEXT="$(dtctl config current-context --plain)"

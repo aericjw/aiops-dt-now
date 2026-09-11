@@ -65,8 +65,8 @@ tasks:
         | fieldsAdd dt_entity_id = toString(dt.smartscape_source.id)
         | fieldsAdd dt_entity_name = coalesce(getNodeName(dt.smartscape_source.id), arrayFirst(affected_entity_names))
         | fieldsAdd dt_problem_display_id = "{{ event()['display_id'] }}"
-        | fieldsAdd dt_problem_url = concat("https://bwm98081.apps.dynatrace.com/ui/apps/dynatrace.davis.problems/problem/", "{{ event()['event.id'] }}")
-        | lookup [load "/lookups/dt_to_snow_cmdb_mapping_v5"],
+        | fieldsAdd dt_problem_url = concat("{{environment()["url"] }}", "/ui/apps/dynatrace.davis.problems/problem/", "{{ event()['event.id'] }}")
+        | lookup [load "/lookups/dt_to_snow_cmdb_mapping_v6"],
             sourceField: dt_entity_key, lookupField: dt_entity_key,
             fields: {now_ci_class, bind_strategy, sgc_managed}
         | lookup [ smartscapeEdges "runs_on", from:-24h
@@ -103,7 +103,7 @@ tasks:
           value: '{{ _.item["event.id"] }}'
         - id: f-source
           key: source
-          value: "{{ input('snow_source') }}"
+          value: '{{ input(''snow_source'') }}'
         - id: f-severity
           key: severity
           value: '{{ 0 if _.item["event.status"] == "CLOSED" else _.item["event.severity"] }}'
@@ -131,7 +131,7 @@ tasks:
         - id: f-additional-info
           key: additional_info
           value: '{{ _.item }}'
-      tableName: "{{ input('snow_table') }}"
+      tableName: '{{ input(''snow_table'') }}'
       # I1 fix (final whole-branch review, 2026-09-08): a `kb_url` mapping
       # used to be listed here, but snow_table is em_event, which has no
       # kb_url column at all (confirmed via sys_dictionary: 0 rows for

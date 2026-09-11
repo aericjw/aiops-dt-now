@@ -10,7 +10,7 @@ fetch events, from:"{{event()["timestamp"]}}"-5m, to:"{{event()["timestamp"]}}"+
 | fieldsAdd dt_entity_name = coalesce(getNodeName(dt.smartscape_source.id), arrayFirst(affected_entity_names))
 | fieldsAdd dt_problem_display_id = "{{ event()['display_id'] }}"
 | fieldsAdd dt_problem_url = concat("https://bwm98081.apps.dynatrace.com/ui/apps/dynatrace.davis.problems/problem/", "{{ event()['event.id'] }}")
-| lookup [load "/lookups/dt_to_snow_cmdb_mapping_v5"],
+| lookup [load "/lookups/dt_to_snow_cmdb_mapping_v6"],
     sourceField: dt_entity_key, lookupField: dt_entity_key,
     fields: {now_ci_class, bind_strategy, sgc_managed}
 | lookup [ smartscapeEdges "runs_on", from:-24h

@@ -20,7 +20,7 @@ fetch dt.davis.events, from:-24h
 | fieldsAdd dt_entity_key = if(isNull(raw), "__unknown__",
     else: lower(if(startsWith(raw, "dt.entity."), substring(raw, from: 10), else: raw)))
 | summarize events = count(), by: {dt_entity_key}
-| lookup [load "/lookups/dt_to_snow_cmdb_mapping_v5"],
+| lookup [load "/lookups/dt_to_snow_cmdb_mapping_v6"],
     sourceField: dt_entity_key, lookupField: dt_entity_key,
     fields: {now_ci_class, bind_strategy}
 | filter isNull(now_ci_class) or isNull(bind_strategy)
