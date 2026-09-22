@@ -25,6 +25,15 @@ declare global {
                         table: 'cmdb_ci'
                         id: '53b16cc7072a49cc867020676c9ee8a3'
                     }
+                    'dt-backfill-db-mssql-01': {
+                        table: 'cmdb_ci_db_mssql_instance'
+                        id: '3602d63fe9134370bbe5b358c92dda41'
+                        deleted: true
+                    }
+                    'dt-backfill-db-mssql-02': {
+                        table: 'cmdb_ci_db_mssql_instance'
+                        id: 'b64869c8e0d3415fb115ae1f5f9fb578'
+                    }
                     'dt-backfill-frontend-01': {
                         table: 'cmdb_ci_web_application'
                         id: '2121a2e59d6a48dabb641b5ef2ddfd35'
@@ -224,6 +233,10 @@ declare global {
                     'dt-bind-sgc-service': {
                         table: 'em_match_rule'
                         id: 'c40c1fe9cbe5430682f3d90969cdb638'
+                    }
+                    'dt-correlate-by-display-id': {
+                        table: 'em_alert_correlation_rule'
+                        id: '188df85b6a464c5e88aa0d0792de55da'
                     }
                     'dt-correlate-by-problem': {
                         table: 'em_alert_correlation_rule'

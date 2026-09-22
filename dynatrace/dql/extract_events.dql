@@ -1,4 +1,4 @@
-fetch events, from:"{{event()["timestamp"]}}"-5m, to:"{{event()["timestamp"]}}"+5m
+fetch events, from:toTimestamp("{{event()["timestamp"]}}")-15m, to:toTimestamp("{{event()["timestamp"]}}"+15m)
 | filter event.kind == "DAVIS_EVENT"
 | filter in(event.id, {{event()["dt.davis.event_ids"] | replace("[", "{") | replace("]", "}") | replace("'", "\"")}})
 | dedup event.id, sort:{timestamp desc}
@@ -7,9 +7,28 @@ fetch events, from:"{{event()["timestamp"]}}"-5m, to:"{{event()["timestamp"]}}"+
 | fieldsAdd dt_entity_key = if(isNull(dt_raw_type), "__unknown__",
     else: lower(if(startsWith(dt_raw_type, "dt.entity."), substring(dt_raw_type, from: 10), else: dt_raw_type)))
 | fieldsAdd dt_entity_id = toString(dt.smartscape_source.id)
-| fieldsAdd dt_entity_name = coalesce(getNodeName(dt.smartscape_source.id), arrayFirst(affected_entity_names))
+// Fix (2026-09-15, P-26092999 investigation): the authoritative Davis
+// root-cause signal is the PROBLEM's own root_cause_entity_id (only ever
+// populated on the DAVIS_PROBLEM trigger event, exposed here via event()),
+// NOT the per-event dt.davis.is_rootcause_relevant flag -- that flag was
+// observed true on BOTH events of a 2-entity problem simultaneously
+// (broker-service and frontendreverseproxy both true), letting whichever
+// alert arrived later in ServiceNow win PRIMARY regardless of which one
+// Davis actually named as root cause. Comparing dt_entity_id against the
+// problem-level root_cause_entity_id is exclusive by construction (at most
+// one entity can equal it).
+// FIX (2026-09-15, P-26093008 execution failure): root_cause_entity_id is
+// not always present on the trigger event -- a single-entity problem, or a
+// pre-root-cause-determination update, has no such field at all, and an
+// unguarded {{ event()['root_cause_entity_id'] }} throws "Undefined
+// variables" and fails the ENTIRE extract_events task (no events at all,
+// including a close, reach ServiceNow for that execution). Defaulted to an
+// empty string, which dt_entity_id (never empty) can never equal, so
+// dt_is_root_cause safely evaluates to false rather than crashing the task.
+| fieldsAdd dt_is_root_cause = dt_entity_id == "{{ event()['root_cause_entity_id'] | default('', true) }}"
+| fieldsAdd dt_entity_name = coalesce(getNodeName(dt.smartscape_source.id), arrayFirst(affected_entity_names), dt.entity.application.name)
 | fieldsAdd dt_problem_display_id = "{{ event()['display_id'] }}"
-| fieldsAdd dt_problem_url = concat("https://bwm98081.apps.dynatrace.com/ui/apps/dynatrace.davis.problems/problem/", "{{ event()['event.id'] }}")
+| fieldsAdd dt_problem_url = concat("{{environment()["url"] }}", "/ui/apps/dynatrace.davis.problems/problem/", "{{ event()['event.id'] }}")
 | lookup [load "/lookups/dt_to_snow_cmdb_mapping_v6"],
     sourceField: dt_entity_key, lookupField: dt_entity_key,
     fields: {now_ci_class, bind_strategy, sgc_managed}
@@ -22,7 +41,11 @@ fetch events, from:"{{event()["timestamp"]}}"-5m, to:"{{event()["timestamp"]}}"+
 | fieldsAdd dt_ci_name = if(bind_strategy == "sgc_service" and isNotNull(dt_entity_name), concat(dt_entity_name, " - ", dt_entity_id),
     else: if(bind_strategy == "sgc_process" and isNotNull(dt_entity_name) and isNotNull(host_name), concat(dt_entity_name, "@", host_name),
     else: dt_entity_name))
-| fields event.id, event.name, event.category, event.severity, event.status,
-    event.description, dt_entity_key, dt_entity_id, dt_entity_name, dt_ci_name,
-    now_ci_class, bind_strategy, sgc_managed,
-    dt.davis.is_rootcause_relevant, dt_problem_display_id, dt_problem_url, timestamp
+// fieldsKeep is disabled live (added directly on the instance, not by this
+// repo) -- every field currently passes through to additional_info
+// unfiltered. Kept commented here to match live rather than silently
+// re-narrowing it on the next apply.
+//| fieldsKeep event.id, event.name, event.category, event.severity, event.status,
+//    event.description, dt_entity_key, dt_entity_id, dt_entity_name, dt_ci_name,
+//    now_ci_class, bind_strategy, sgc_managed,
+//    dt.davis.is_rootcause_relevant, dt_problem_display_id, dt_problem_url, timestamp, entity_tags, "primary_tags.*"

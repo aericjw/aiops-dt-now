@@ -106,6 +106,17 @@ import { Record } from '@servicenow/sdk/core'
 // cross-source primary selection possible at all rather than a regression
 // for anyone.
 //
+// --- Display_id-first, CI second (2026-09-15) ------------------------------
+// dynatrace-correlation-by-display-id.now.ts now runs at order 85, strictly
+// before this rule, and claims any Dynatrace alert that shares a
+// dt_problem_display_id with another still-groupable Dynatrace alert --
+// preserving Davis's own topology-aware root-cause grouping exactly, rather
+// than re-deriving it from cmdb_ci. That rule deliberately returns no result
+// for a SOLO Dynatrace alert (no display_id sibling yet), so this rule still
+// sees those -- and still sees every other source's alert -- unchanged. Net
+// effect: a multi-event Davis problem groups by display_id first; a solo
+// Dynatrace alert, or any non-Dynatrace alert, still groups by CI here.
+//
 // Scope: widened from `source=Dynatrace` to "any alert with a bound CI",
 // EXCEPT `Azure Monitor` -- that source already has its own dedicated,
 // more specific correlation rule ("[Tag Based] Azure Monitor Correlation",
@@ -139,11 +150,22 @@ Record({
         generate_virtual_alerts: false,
         script: `(function findCorrelatedAlerts(currentAlert) {
     // Best-effort, optional signal: Dynatrace alerts carry
-    // dt.davis.is_rootcause_relevant inside additional_info's Java
-    // Map#toString-shaped additional_content string. Any other source
-    // simply won't match this regex -- isDavisRootCause returns false, and
-    // ranking falls through to severity below. Never required, never
-    // assumed present.
+    // dt_is_root_cause inside additional_info's Java Map#toString-shaped
+    // additional_content string. Any other source simply won't match this
+    // regex -- isDavisRootCause returns false, and ranking falls through to
+    // severity below. Never required, never assumed present.
+    //
+    // FIX (2026-09-15, P-26092999 investigation): this used to read
+    // dt.davis.is_rootcause_relevant, a per-EVENT flag. Live investigation
+    // found Davis sets that flag true on MULTIPLE events of the same
+    // multi-entity problem simultaneously (e.g. both the actual root-cause
+    // service and a downstream affected service) -- it is not exclusive, so
+    // whichever alert happened to arrive last in ServiceNow would win
+    // PRIMARY regardless of Davis's actual determination. dt_is_root_cause
+    // (set in dynatrace/dql/extract_events.dql / the deployed workflow) is
+    // computed by comparing each event's own entity id against the Davis
+    // PROBLEM's single root_cause_entity_id, so at most one event's alert can
+    // ever have it true -- a real fix, not just a rename.
     function isDavisRootCause(additionalInfoRaw) {
         var parsed;
         try {
@@ -155,7 +177,7 @@ Record({
         // Anchored to a key boundary (start of string, "{", or ", ") so a
         // hypothetical future key merely ending in the same suffix can't
         // false-match.
-        var m = content.match(/(?:^|[{,]\\s*)dt\\.davis\\.is_rootcause_relevant=(true|false)/);
+        var m = content.match(/(?:^|[{,]\\s*)dt_is_root_cause=(true|false)/);
         return m ? (m[1] === 'true') : false;
     }
 
